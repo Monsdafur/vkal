@@ -337,11 +337,35 @@ TEST(MemoryAllocatorTest, AddBufferNewBlockIncompatibleType) {
         .memory_allocator = *o.memory_allocator,
         .size = 16,
         .usage = vk::BufferUsageFlagBits::eStorageBuffer,
-        .memory_properties =
-            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+        .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible,
     });
 
     ASSERT_EQ(o.memory_allocator->blocks.size(), 2);
+
+    SDL_Quit();
+}
+
+TEST(MemoryAllocatorTest, RemoveBufferFreeBlock) {
+    TestObjects o = create_test_objects();
+    BufferPtr b0 = buffer_ptr(BufferParams{
+        .vkal_device = *o.vkal_device,
+        .memory_allocator = *o.memory_allocator,
+        .size = 40,
+        .usage = vk::BufferUsageFlagBits::eStorageBuffer,
+        .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+    });
+    {
+        BufferPtr b1 = buffer_ptr(BufferParams{
+            .vkal_device = *o.vkal_device,
+            .memory_allocator = *o.memory_allocator,
+            .size = 16,
+            .usage = vk::BufferUsageFlagBits::eStorageBuffer,
+            .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible,
+        });
+
+        ASSERT_EQ(o.memory_allocator->blocks.size(), 2);
+    }
+    ASSERT_EQ(o.memory_allocator->blocks.size(), 1);
 
     SDL_Quit();
 }
