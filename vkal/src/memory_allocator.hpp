@@ -47,6 +47,7 @@ class MemoryAllocator {
     FRIEND_TEST(MemoryAllocatorTest, AddBufferNewBlockOverflow);
     FRIEND_TEST(MemoryAllocatorTest, AddBufferHostVisible);
     FRIEND_TEST(MemoryAllocatorTest, AddBufferNewBlockIncompatibleType);
+    FRIEND_TEST(MemoryAllocatorTest, RemoveBufferFreeBlock);
 };
 
 using MemoryAllocatorPtr = std::unique_ptr<MemoryAllocator>;
