@@ -1,0 +1,64 @@
+#pragma once
+
+#include <SDL3/SDL_vulkan.h>
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#include "instance.hpp"
+
+#include <cstdint>
+
+namespace vkal {
+
+struct DeviceParams {
+    Instance& vkal_instance;
+    std::vector<std::string> device_extensions;
+};
+
+class Device {
+  public:
+    // No copy and mo move
+    Device(const Device&) = delete;
+    Device& operator=(const Device&) = delete;
+    Device(Device&&) = delete;
+    Device& operator=(Device&&) = delete;
+
+    explicit Device(const DeviceParams& params);
+
+    ~Device();
+
+    vk::PhysicalDevice get_physical();
+
+    vk::Device get();
+
+    const vk::PhysicalDeviceProperties& get_properties() const;
+
+    uint32_t get_queue_index(vk::QueueFlags queue_flags);
+
+    vk::Queue get_queue(uint32_t index);
+
+    vk::Queue get_present_queue(const vk::SurfaceKHR& surface);
+
+    vk::CommandPool get_command_pool(uint32_t index);
+
+  private:
+    void select_physical_device(const DeviceParams& params);
+
+    void create_device(const DeviceParams& params);
+
+    void get_queues();
+
+    Instance& vkal_instance;
+    vk::PhysicalDeviceProperties physical_device_properties;
+    vk::PhysicalDevice physical_device = nullptr;
+    vk::Device device = nullptr;
+    std::vector<vk::QueueFamilyProperties> queue_properties;
+    std::vector<vk::Queue> queues;
+    std::vector<vk::CommandPool> command_pools;
+};
+
+using DevicePtr = std::unique_ptr<Device>;
+
+inline DevicePtr device_ptr(const DeviceParams& params) {
+    return std::make_unique<Device>(params);
+}
+
+} // namespace vkal
