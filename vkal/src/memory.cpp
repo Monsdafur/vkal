@@ -99,9 +99,9 @@ void MemoryBlock::map_data(MemoryChunk& chunk, void** data) {
 
 ///////////////////////////////////////////////////////////
 void MemoryBlock::flush() {
-    bool is_visible = (this->properties & vk::MemoryPropertyFlagBits::eHostVisible) !=
+    bool is_visible = (this->properties & vk::MemoryPropertyFlagBits::eHostVisible) ==
                       vk::MemoryPropertyFlagBits::eHostVisible;
-    bool is_coherent = (this->properties & vk::MemoryPropertyFlagBits::eHostCoherent) !=
+    bool is_coherent = (this->properties & vk::MemoryPropertyFlagBits::eHostCoherent) ==
                        vk::MemoryPropertyFlagBits::eHostCoherent;
     if (is_visible && !is_coherent) {
         this->vkal_device.get().flushMappedMemoryRanges(this->memory_range);
