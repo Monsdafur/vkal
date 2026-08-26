@@ -6,6 +6,18 @@
 namespace vkal {
 
 ///////////////////////////////////////////////////////////
+static std::string size_as_string(vk::DeviceSize size) {
+    std::string level[4] = {"B", "KiB", "MB", "GiB"};
+    size_t current_level = 0;
+    while (size >= 1024 && current_level <= 3) {
+        size /= 1024;
+        current_level++;
+    }
+
+    return std::format("{} {}", size, level[current_level]);
+}
+
+///////////////////////////////////////////////////////////
 static uint32_t find_memory_type(vk::PhysicalDevice physical_device, uint32_t filter,
                                  vk::MemoryPropertyFlags properties) {
     vk::PhysicalDeviceMemoryProperties physical_device_memory_properties =
@@ -90,7 +102,9 @@ std::pair<MemoryBlock&, MemoryChunk&>
 MemoryAllocator::query_block(vk::MemoryPropertyFlags memory_properties,
                              const vk::MemoryRequirements& memory_requirements) {
     if (memory_requirements.size > this->block_size) {
-        throw std::runtime_error("Request memory size exceed memory block size limit");
+        throw std::runtime_error(std::format(
+            "Request memory size ({}) exceed memory block size ({}) limit",
+            size_as_string(memory_requirements.size), size_as_string(this->block_size)));
     }
 
     uint32_t memory_type = find_memory_type(this->vkal_device.get_physical(),

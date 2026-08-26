@@ -56,6 +56,9 @@ class MemoryAllocator {
     FRIEND_TEST(MemoryAllocatorTest, AddBufferHostVisible);
     FRIEND_TEST(MemoryAllocatorTest, AddBufferNewBlockIncompatibleType);
     FRIEND_TEST(MemoryAllocatorTest, RemoveBufferFreeBlock);
+
+    FRIEND_TEST(MemoryAllocatorTest, AddImage);
+    FRIEND_TEST(MemoryAllocatorTest, ImageFail);
 };
 
 using MemoryAllocatorPtr = std::unique_ptr<MemoryAllocator>;
