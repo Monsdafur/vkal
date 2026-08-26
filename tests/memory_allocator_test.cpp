@@ -1,4 +1,6 @@
 #include "../vkal/src/buffer.hpp"
+#include "../vkal/src/common.hpp"
+#include "../vkal/src/image.hpp"
 #include "../vkal/src/memory_allocator.hpp"
 
 #include <SDL3/SDL.h>
@@ -12,7 +14,7 @@ struct TestObjects {
     MemoryAllocatorPtr memory_allocator;
 };
 
-TestObjects create_test_objects() {
+TestObjects create_test_objects(vk::DeviceSize size = kilobytes(1)) {
     SDL_Init(SDL_INIT_VIDEO);
 
     InstancePtr vkal_instance = vkal::instance_ptr();
@@ -22,7 +24,7 @@ TestObjects create_test_objects() {
                               vk::KHRSynchronization2ExtensionName}});
     MemoryAllocatorPtr memory_allocator = vkal::memory_allocator_ptr(vkal::MemoryAllocatorParams{
         .vkal_device = *vkal_device,
-        .block_size = 1024,
+        .block_size = size,
     });
 
     return TestObjects{
@@ -366,6 +368,53 @@ TEST(MemoryAllocatorTest, RemoveBufferFreeBlock) {
         ASSERT_EQ(o.memory_allocator->blocks.size(), 2);
     }
     ASSERT_EQ(o.memory_allocator->blocks.size(), 1);
+
+    SDL_Quit();
+}
+
+TEST(MemoryAllocatorTest, AddImage) {
+    TestObjects o = create_test_objects(megabytes(1));
+    ImagePtr i = image_ptr(ImageParams{
+        .vkal_device = *o.vkal_device,
+        .memory_allocator = *o.memory_allocator,
+        .type = vk::ImageType::e2D,
+        .extent = vk::Extent3D(32, 32, 1),
+        .format = vk::Format::eR8G8B8A8Srgb,
+        .aspects = vk::ImageAspectFlagBits::eColor,
+        .mip_levels = 1,
+        .usage = vk::ImageUsageFlagBits::eSampled,
+        .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+    });
+
+    ASSERT_EQ(o.memory_allocator->blocks.size(), 1);
+
+    std::vector<std::vector<std::reference_wrapper<MemoryChunk>>> block_chunks;
+
+    for (auto& block : o.memory_allocator->blocks) {
+        block_chunks.push_back(block->get_all_chunks());
+    }
+
+    ASSERT_EQ(block_chunks.at(0).at(0).get().offset, 0);
+    ASSERT_EQ(block_chunks.at(0).at(0).get().size, kilobytes(4));
+    ASSERT_TRUE(block_chunks.at(0).at(0).get().occupied);
+
+    SDL_Quit();
+}
+
+TEST(MemoryAllocatorTest, ImageFail) {
+    TestObjects o = create_test_objects(megabytes(1));
+    EXPECT_THROW(image_ptr(ImageParams{
+                     .vkal_device = *o.vkal_device,
+                     .memory_allocator = *o.memory_allocator,
+                     .type = vk::ImageType::e2D,
+                     .extent = vk::Extent3D(1024, 1024, 1),
+                     .format = vk::Format::eR8G8B8A8Srgb,
+                     .aspects = vk::ImageAspectFlagBits::eColor,
+                     .mip_levels = 11,
+                     .usage = vk::ImageUsageFlagBits::eSampled,
+                     .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+                 }),
+                 std::runtime_error);
 
     SDL_Quit();
 }
