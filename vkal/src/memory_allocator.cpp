@@ -26,11 +26,71 @@ MemoryAllocator::MemoryAllocator(const MemoryAllocatorParams& params)
     : vkal_device(params.vkal_device), block_size(params.block_size) {
 }
 
+///////////////////////////////////////////////////////////
 std::pair<MemoryBlock&, MemoryChunk&>
 MemoryAllocator::bind_buffer(vk::Buffer buffer, vk::MemoryPropertyFlags memory_properties,
                              const vk::MemoryRequirements& memory_requirements) {
+    auto memory_block = this->query_block(memory_properties, memory_requirements);
+
+    // Bind buffer
+    vk::BindBufferMemoryInfo bind_buffer_info;
+    bind_buffer_info.setBuffer(buffer)
+        .setMemory(memory_block.first.memory)
+        .setMemoryOffset(memory_block.second.offset);
+    this->vkal_device.get().bindBufferMemory2(bind_buffer_info);
+
+    return memory_block;
+}
+
+std::pair<MemoryBlock&, MemoryChunk&>
+MemoryAllocator::bind_image(vk::Image image, vk::MemoryPropertyFlags memory_properties,
+                            const vk::MemoryRequirements& memory_requirements) {
+    auto memory_block = this->query_block(memory_properties, memory_requirements);
+    // Bind buffer
+    vk::BindImageMemoryInfo bind_image_info;
+    bind_image_info.setImage(image)
+        .setMemory(memory_block.first.memory)
+        .setMemoryOffset(memory_block.second.offset);
+    this->vkal_device.get().bindImageMemory2(bind_image_info);
+
+    return memory_block;
+}
+
+///////////////////////////////////////////////////////////
+void MemoryAllocator::flush() {
+    for (auto& block : this->blocks) {
+        block->flush();
+    }
+}
+
+///////////////////////////////////////////////////////////
+void MemoryAllocator::dump(vk::DeviceSize unit) {
+    size_t index = 0;
+    for (auto& block : this->blocks) {
+        std::print("Block: {}", index++);
+        block->dump(unit);
+    }
+}
+
+///////////////////////////////////////////////////////////
+void MemoryAllocator::clean(MemoryBlock& block) {
+    if (block.chunk_count == 1 && !block.first_chunk->occupied) {
+        for (size_t i = 0; i < this->blocks.size(); ++i) {
+            if (this->blocks.at(i).get() == &block) {
+                this->blocks.erase(this->blocks.begin() + i);
+                return;
+            }
+        }
+        throw std::runtime_error("This memory block is not or no longer belong to this allocator");
+    }
+}
+
+///////////////////////////////////////////////////////////
+std::pair<MemoryBlock&, MemoryChunk&>
+MemoryAllocator::query_block(vk::MemoryPropertyFlags memory_properties,
+                             const vk::MemoryRequirements& memory_requirements) {
     if (memory_requirements.size > this->block_size) {
-        throw std::runtime_error("Request buffer size exceed memory block size limit");
+        throw std::runtime_error("Request memory size exceed memory block size limit");
     }
 
     uint32_t memory_type = find_memory_type(this->vkal_device.get_physical(),
@@ -77,43 +137,7 @@ MemoryAllocator::bind_buffer(vk::Buffer buffer, vk::MemoryPropertyFlags memory_p
         query_block = *this->blocks.back();
     }
 
-    // Bind buffer
-    vk::BindBufferMemoryInfo bind_buffer_info;
-    bind_buffer_info.setBuffer(buffer)
-        .setMemory(query_block->get().memory)
-        .setMemoryOffset(query_chunk->get().offset);
-    this->vkal_device.get().bindBufferMemory2(bind_buffer_info);
-
     return {query_block->get(), query_chunk->get()};
-}
-
-///////////////////////////////////////////////////////////
-void MemoryAllocator::flush() {
-    for (auto& block : this->blocks) {
-        block->flush();
-    }
-}
-
-///////////////////////////////////////////////////////////
-void MemoryAllocator::dump(vk::DeviceSize unit) {
-    size_t index = 0;
-    for (auto& block : this->blocks) {
-        std::print("Block: {}", index++);
-        block->dump(unit);
-    }
-}
-
-///////////////////////////////////////////////////////////
-void MemoryAllocator::clean(MemoryBlock& block) {
-    if (block.chunk_count == 1 && !block.first_chunk->occupied) {
-        for (size_t i = 0; i < this->blocks.size(); ++i) {
-            if (this->blocks.at(i).get() == &block) {
-                this->blocks.erase(this->blocks.begin() + i);
-                return;
-            }
-        }
-        throw std::runtime_error("This memory block is not or no longer belong to this allocator");
-    }
 }
 
 } // namespace vkal

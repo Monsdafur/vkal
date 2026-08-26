@@ -30,6 +30,10 @@ class MemoryAllocator {
     bind_buffer(vk::Buffer buffer, vk::MemoryPropertyFlags memory_properties,
                 const vk::MemoryRequirements& memory_requirements);
 
+    std::pair<MemoryBlock&, MemoryChunk&>
+    bind_image(vk::Image image, vk::MemoryPropertyFlags memory_properties,
+               const vk::MemoryRequirements& memory_requirements);
+
     void clean(MemoryBlock& block);
 
     void flush();
@@ -37,6 +41,10 @@ class MemoryAllocator {
     void dump(vk::DeviceSize unit);
 
   private:
+    std::pair<MemoryBlock&, MemoryChunk&>
+    query_block(vk::MemoryPropertyFlags memory_properties,
+                const vk::MemoryRequirements& memory_requirements);
+
     Device& vkal_device;
     vk::DeviceSize block_size;
     std::vector<MemoryBlockPtr> blocks;
