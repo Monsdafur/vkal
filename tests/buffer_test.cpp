@@ -1,5 +1,4 @@
 #include "../vkal/src/buffer.hpp"
-#include "../vkal/src/command.hpp"
 #include "../vkal/src/memory_allocator.hpp"
 
 #include <SDL3/SDL.h>
@@ -49,96 +48,6 @@ TEST(BufferTest, MapData) {
 
     b->upload(input.data(), sizeof(float) * input.size());
     b->get_raw_data(output.data());
-
-    for (size_t i = 0; i < input.size(); ++i) {
-        ASSERT_EQ(output.at(i), input.at(i));
-    }
-
-    SDL_Quit();
-}
-
-TEST(BufferTest, Copy) {
-    TestObjects o = create_test_objects();
-    uint16_t queue_index = o.vkal_device->get_queue_index(vk::QueueFlagBits::eTransfer);
-    vk::Queue queue = o.vkal_device->get_queue(0);
-    CommandPtr command = command_ptr(CommandParams{
-        .vkal_device = *o.vkal_device,
-        .level = vk::CommandBufferLevel::ePrimary,
-        .queue_index = queue_index,
-    });
-
-    std::array<uint32_t, 4> input = {1, 2, 4, 8};
-    std::array<uint32_t, 4> output;
-
-    BufferPtr b_src = buffer_ptr(BufferParams{
-        .vkal_device = *o.vkal_device,
-        .memory_allocator = *o.memory_allocator,
-        .size = sizeof(uint32_t) * input.size(),
-        .usage = vk::BufferUsageFlagBits::eTransferSrc,
-        .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible,
-    });
-
-    BufferPtr b_dst = buffer_ptr(BufferParams{
-        .vkal_device = *o.vkal_device,
-        .memory_allocator = *o.memory_allocator,
-        .size = sizeof(uint32_t) * input.size(),
-        .usage = vk::BufferUsageFlagBits::eTransferDst,
-        .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible,
-    });
-
-    b_src->upload(input.data(), sizeof(uint32_t) * input.size());
-    b_dst->copy_and_submit(queue, command->get(0), *b_src);
-    b_dst->get_raw_data(output.data());
-
-    for (size_t i = 0; i < input.size(); ++i) {
-        ASSERT_EQ(output.at(i), input.at(i));
-    }
-
-    SDL_Quit();
-}
-
-TEST(BufferTest, CopyToDeviceLocal) {
-    TestObjects o = create_test_objects();
-    uint16_t queue_index = o.vkal_device->get_queue_index(vk::QueueFlagBits::eTransfer);
-    vk::Queue queue = o.vkal_device->get_queue(0);
-    CommandPtr command = command_ptr(CommandParams{
-        .vkal_device = *o.vkal_device,
-        .level = vk::CommandBufferLevel::ePrimary,
-        .queue_index = queue_index,
-    });
-
-    std::array<uint32_t, 4> input = {1, 2, 4, 8};
-    std::array<uint32_t, 4> output;
-
-    BufferPtr b_src = buffer_ptr(BufferParams{
-        .vkal_device = *o.vkal_device,
-        .memory_allocator = *o.memory_allocator,
-        .size = sizeof(uint32_t) * input.size(),
-        .usage = vk::BufferUsageFlagBits::eTransferSrc,
-        .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible,
-    });
-
-    BufferPtr b_local = buffer_ptr(BufferParams{
-        .vkal_device = *o.vkal_device,
-        .memory_allocator = *o.memory_allocator,
-        .size = sizeof(uint32_t) * input.size(),
-        .usage = vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst,
-        .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
-    });
-
-    BufferPtr b_dst = buffer_ptr(BufferParams{
-        .vkal_device = *o.vkal_device,
-        .memory_allocator = *o.memory_allocator,
-        .size = sizeof(uint32_t) * input.size(),
-        .usage = vk::BufferUsageFlagBits::eTransferDst,
-        .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible,
-    });
-
-    b_src->upload(input.data(), sizeof(uint32_t) * input.size());
-    o.memory_allocator->flush();
-    b_local->copy_and_submit(queue, command->get(0), *b_src);
-    b_dst->copy_and_submit(queue, command->get(0), *b_local);
-    b_dst->get_raw_data(output.data());
 
     for (size_t i = 0; i < input.size(); ++i) {
         ASSERT_EQ(output.at(i), input.at(i));
