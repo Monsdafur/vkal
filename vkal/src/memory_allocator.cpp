@@ -30,7 +30,7 @@ static uint32_t find_memory_type(vk::PhysicalDevice physical_device, uint32_t fi
         }
     }
 
-    throw std::runtime_error("Failed to match memory type filter");
+    throw std::runtime_error("Failed to match memory type filter or unsupported memory properties");
 }
 
 ///////////////////////////////////////////////////////////
