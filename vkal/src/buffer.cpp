@@ -21,36 +21,20 @@ Buffer::~Buffer() {
 }
 
 ///////////////////////////////////////////////////////////
+vk::Buffer Buffer::get() {
+    return this->buffer;
+}
+
+///////////////////////////////////////////////////////////
 const vk::MemoryRequirements Buffer::get_memory_requirements() const {
     return this->memory_requirements;
 }
 
 ///////////////////////////////////////////////////////////
-void Buffer::copy(vk::CommandBuffer command, Buffer& other) {
-    vk::BufferCopy2 buffer_copy;
-    buffer_copy.setSrcOffset(0).setDstOffset(0).setSize(this->size);
-    vk::CopyBufferInfo2 copy_buffer_info;
-    copy_buffer_info.setSrcBuffer(other.buffer).setDstBuffer(this->buffer).setRegions(buffer_copy);
-    command.copyBuffer2(copy_buffer_info);
-}
-
-///////////////////////////////////////////////////////////
-void Buffer::copy_and_submit(vk::Queue queue, vk::CommandBuffer command, Buffer& other) {
-    command.begin(vk::CommandBufferBeginInfo());
-    this->copy(command, other);
-    command.end();
-
-    vk::CommandBufferSubmitInfo command_submit_info;
-    command_submit_info.setCommandBuffer(command).setDeviceMask(1);
-    vk::SubmitInfo2 submit_info;
-    submit_info.setCommandBufferInfos(command_submit_info);
-
-    queue.submit2(submit_info);
-    queue.waitIdle();
-}
-
-///////////////////////////////////////////////////////////
 void Buffer::upload(void* data, vk::DeviceSize size) {
+    if (!this->data) {
+        throw std::runtime_error("Uploading to a non host visible buffer");
+    }
     if (size > memory_requirements.size) {
         throw std::runtime_error("Upload size exceeds buffer size");
     }
@@ -59,7 +43,15 @@ void Buffer::upload(void* data, vk::DeviceSize size) {
 
 ///////////////////////////////////////////////////////////
 void Buffer::get_raw_data(void* data) {
+    if (!this->data) {
+        throw std::runtime_error("Reading from a non host visible buffer");
+    }
     std::memcpy(data, this->data, this->size);
+}
+
+///////////////////////////////////////////////////////////
+vk::DeviceSize Buffer::get_size() {
+    return this->size;
 }
 
 ///////////////////////////////////////////////////////////

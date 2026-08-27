@@ -26,15 +26,15 @@ class Buffer {
 
     ~Buffer();
 
+    vk::Buffer get();
+
     const vk::MemoryRequirements get_memory_requirements() const;
-
-    void copy(vk::CommandBuffer command, Buffer& other);
-
-    void copy_and_submit(vk::Queue queue, vk::CommandBuffer command, Buffer& other);
 
     void upload(void* data, vk::DeviceSize size);
 
     void get_raw_data(void* data);
+
+    vk::DeviceSize get_size();
 
   private:
     vk::Buffer create_buffer(const BufferParams& params);
