@@ -33,7 +33,7 @@ class Sampler {
     vk::Sampler get();
 
   private:
-    vkal::Device& vkal_device;
+    Device& vkal_device;
     vk::Sampler sampler;
 };
 

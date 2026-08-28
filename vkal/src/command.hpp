@@ -29,7 +29,7 @@ class Command {
     vk::CommandBuffer get(uint32_t index);
 
   private:
-    vkal::Device& vkal_device;
+    Device& vkal_device;
     vk::CommandPool command_pool;
     std::vector<vk::CommandBuffer> commands;
 };

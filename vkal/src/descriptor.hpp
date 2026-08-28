@@ -29,7 +29,7 @@ class Descriptor {
     vk::DescriptorPool get();
 
   private:
-    vkal::Device& vkal_device;
+    Device& vkal_device;
     uint32_t set_count;
     std::map<vk::DescriptorType, uint32_t> pool_sizes;
     vk::DescriptorPool pool;

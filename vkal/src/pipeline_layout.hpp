@@ -30,7 +30,7 @@ class PipelineLayout {
     std::vector<std::reference_wrapper<DescriptorLayout>>& get_descriptor_layouts();
 
   private:
-    vkal::Device& vkal_device;
+    Device& vkal_device;
     std::vector<std::reference_wrapper<DescriptorLayout>> vkal_descriptor_layouts;
     vk::PipelineLayout layout;
 };

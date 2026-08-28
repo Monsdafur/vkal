@@ -53,7 +53,7 @@ class Pipeline {
     vk::PipelineBindPoint get_bind_point();
 
   private:
-    vkal::Device& vkal_device;
+    Device& vkal_device;
     PipelineLayout& vkal_layout;
     vk::PipelineBindPoint bind_point;
     vk::Pipeline pipeline;
