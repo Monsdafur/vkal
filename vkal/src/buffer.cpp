@@ -4,11 +4,11 @@ namespace vkal {
 
 ///////////////////////////////////////////////////////////
 Buffer::Buffer(const BufferParams& params)
-    : vkal_device(params.vkal_device), memory_allocator(params.memory_allocator), size(params.size),
-      buffer(this->create_buffer(params)), memory_requirements(this->get_requirements()),
-      memory_block(this->get_memory_block(params)) {
-
-    this->memory_block.first.map_data(this->memory_block.second, &this->data);
+    : vkal_device(params.vkal_device), size(params.size), buffer(this->create_buffer(params)),
+      memory_requirements(this->get_requirements()),
+      allocator_info(params.memory_allocator.bind_buffer(this->buffer, params.memory_properties,
+                                                         this->memory_requirements)) {
+    this->allocator_info.block.map_data(this->allocator_info.chunk, &this->data);
 }
 
 ///////////////////////////////////////////////////////////
@@ -16,8 +16,8 @@ Buffer::~Buffer() {
     this->vkal_device.get().destroyBuffer(this->buffer);
 
     // Sync with memory allocator data
-    this->memory_block.first.remove_chunk(this->memory_block.second);
-    this->memory_allocator.clean(this->memory_block.first);
+    this->allocator_info.block.remove_chunk(this->allocator_info.chunk);
+    this->allocator_info.allocator.clean(this->allocator_info.block);
 }
 
 ///////////////////////////////////////////////////////////
@@ -71,12 +71,6 @@ vk::MemoryRequirements Buffer::get_requirements() {
     return this->vkal_device.get()
         .getBufferMemoryRequirements2(memory_requirements_info)
         .memoryRequirements;
-}
-
-///////////////////////////////////////////////////////////
-std::pair<MemoryBlock&, MemoryChunk&> Buffer::get_memory_block(const BufferParams& params) {
-    return this->memory_allocator.bind_buffer(this->buffer, params.memory_properties,
-                                              this->memory_requirements);
 }
 
 } // namespace vkal

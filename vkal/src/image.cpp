@@ -4,33 +4,35 @@ namespace vkal {
 
 ///////////////////////////////////////////////////////////
 Image::Image(const ImageParams& params)
-    : vkal_device(params.vkal_device), memory_allocator(params.memory_allocator), type(params.type),
+    : vkal_device(params.vkal_device), type(params.type), view_type(params.view_type),
       extent(params.extent), format(params.format), aspects(params.aspects),
       mip_levels(params.mip_levels), image(this->create_image(params)),
-      memory_requirements(this->get_requirements()), memory_block(this->get_memory_block(params)) {
-    // Setting up resouce range correspond to each mip level
-    vk::ImageSubresourceRange sub_resource_range;
-    sub_resource_range.setAspectMask(this->aspects)
-        .setBaseArrayLayer(0)
-        .setLayerCount(1)
-        .setLevelCount(1);
-    vk::ImageMemoryBarrier2 barrier;
-    barrier.setImage(this->image)
-        .setOldLayout(vk::ImageLayout::eUndefined)
-        .setSrcAccessMask(vk::AccessFlagBits2::eNone)
-        .setSrcStageMask(vk::PipelineStageFlagBits2::eNone);
+      memory_requirements(this->get_requirements()),
+      allocator_info(params.memory_allocator.bind_image(this->image, params.memory_properties,
+                                                        this->memory_requirements)),
+      view(this->create_view()) {
+    this->allocator_info->block.map_data(this->allocator_info->chunk, &this->data);
+    this->is_swapchain_owned = false;
+}
 
-    this->memory_block.first.map_data(this->memory_block.second, &this->data);
+///////////////////////////////////////////////////////////
+Image::Image(const SwapchainImageParams& params)
+    : vkal_device(params.vkal_device), type(vk::ImageType::e2D), view_type(vk::ImageViewType::e2D),
+      extent(params.extent, 1), format(params.format), aspects(params.aspects), mip_levels(1),
+      image(params.image), view(this->create_view()) {
+    this->is_swapchain_owned = true;
 }
 
 ///////////////////////////////////////////////////////////
 Image::~Image() {
     this->vkal_device.get().destroyImageView(this->view);
-    this->vkal_device.get().destroyImage(this->image);
+    if (!this->is_swapchain_owned) {
+        this->vkal_device.get().destroyImage(this->image);
 
-    // Sync with memory allocator data
-    this->memory_block.first.remove_chunk(this->memory_block.second);
-    this->memory_allocator.clean(this->memory_block.first);
+        // Sync with memory allocator data
+        this->allocator_info->block.remove_chunk(this->allocator_info->chunk);
+        this->allocator_info->allocator.clean(this->allocator_info->block);
+    }
 }
 
 ///////////////////////////////////////////////////////////
@@ -68,12 +70,6 @@ vk::MemoryRequirements Image::get_requirements() {
 }
 
 ///////////////////////////////////////////////////////////
-std::pair<MemoryBlock&, MemoryChunk&> Image::get_memory_block(const ImageParams& params) {
-    return this->memory_allocator.bind_image(this->image, params.memory_properties,
-                                             this->memory_requirements);
-}
-
-///////////////////////////////////////////////////////////
 void Image::upload(void* data, vk::DeviceSize size) {
     if (!this->data) {
         throw std::runtime_error("Uploading to a non host visible buffer");
@@ -93,19 +89,8 @@ void Image::get_raw_data(void* data) {
 }
 
 ///////////////////////////////////////////////////////////
-vk::ImageView Image::create_view(const ImageParams& params) {
+vk::ImageView Image::create_view() {
     vk::ImageViewCreateInfo image_view_create_info;
-
-    switch (this->type) {
-    case vk::ImageType::e1D:
-        image_view_create_info.setViewType(vk::ImageViewType::e1D);
-    case vk::ImageType::e2D:
-        image_view_create_info.setViewType(vk::ImageViewType::e2D);
-    case vk::ImageType::e3D:
-        image_view_create_info.setViewType(vk::ImageViewType::e3D);
-    default:
-        throw std::runtime_error("Abiguous image type not compatible to create image view");
-    }
 
     vk::ComponentMapping component_mapping;
     component_mapping.setR(vk::ComponentSwizzle::eR)
@@ -121,6 +106,7 @@ vk::ImageView Image::create_view(const ImageParams& params) {
         .setLayerCount(1);
 
     image_view_create_info.setImage(this->image)
+        .setViewType(this->view_type)
         .setFormat(this->format)
         .setComponents(component_mapping)
         .setSubresourceRange(sub_resource_range);

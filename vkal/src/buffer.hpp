@@ -41,14 +41,11 @@ class Buffer {
 
     vk::MemoryRequirements get_requirements();
 
-    std::pair<MemoryBlock&, MemoryChunk&> get_memory_block(const BufferParams& params);
-
     Device& vkal_device;
-    MemoryAllocator& memory_allocator;
     vk::DeviceSize size;
     vk::Buffer buffer;
     vk::MemoryRequirements memory_requirements;
-    std::pair<MemoryBlock&, MemoryChunk&> memory_block;
+    MemoryAllocatorInfo allocator_info;
     void* data;
 
     // Test

@@ -27,33 +27,34 @@ MemoryAllocator::MemoryAllocator(const MemoryAllocatorParams& params)
 }
 
 ///////////////////////////////////////////////////////////
-std::pair<MemoryBlock&, MemoryChunk&>
+MemoryAllocatorInfo
 MemoryAllocator::bind_buffer(vk::Buffer buffer, vk::MemoryPropertyFlags memory_properties,
                              const vk::MemoryRequirements& memory_requirements) {
-    auto memory_block = this->query_block(memory_properties, memory_requirements);
+    MemoryAllocatorInfo allocator_info = this->query_block(memory_properties, memory_requirements);
 
     // Bind buffer
     vk::BindBufferMemoryInfo bind_buffer_info;
     bind_buffer_info.setBuffer(buffer)
-        .setMemory(memory_block.first.memory)
-        .setMemoryOffset(memory_block.second.offset);
+        .setMemory(allocator_info.block.memory)
+        .setMemoryOffset(allocator_info.chunk.offset);
     this->vkal_device.get().bindBufferMemory2(bind_buffer_info);
 
-    return memory_block;
+    return allocator_info;
 }
 
-std::pair<MemoryBlock&, MemoryChunk&>
-MemoryAllocator::bind_image(vk::Image image, vk::MemoryPropertyFlags memory_properties,
-                            const vk::MemoryRequirements& memory_requirements) {
-    auto memory_block = this->query_block(memory_properties, memory_requirements);
-    // Bind buffer
+///////////////////////////////////////////////////////////
+MemoryAllocatorInfo MemoryAllocator::bind_image(vk::Image image,
+                                                vk::MemoryPropertyFlags memory_properties,
+                                                const vk::MemoryRequirements& memory_requirements) {
+    MemoryAllocatorInfo allocator_info = this->query_block(memory_properties, memory_requirements);
+    // Bind image
     vk::BindImageMemoryInfo bind_image_info;
     bind_image_info.setImage(image)
-        .setMemory(memory_block.first.memory)
-        .setMemoryOffset(memory_block.second.offset);
+        .setMemory(allocator_info.block.memory)
+        .setMemoryOffset(allocator_info.chunk.offset);
     this->vkal_device.get().bindImageMemory2(bind_image_info);
 
-    return memory_block;
+    return allocator_info;
 }
 
 ///////////////////////////////////////////////////////////
@@ -95,7 +96,7 @@ void MemoryAllocator::clean(MemoryBlock& block) {
 }
 
 ///////////////////////////////////////////////////////////
-std::pair<MemoryBlock&, MemoryChunk&>
+MemoryAllocatorInfo
 MemoryAllocator::query_block(vk::MemoryPropertyFlags memory_properties,
                              const vk::MemoryRequirements& memory_requirements) {
     if (memory_requirements.size > this->block_size) {
@@ -148,7 +149,11 @@ MemoryAllocator::query_block(vk::MemoryPropertyFlags memory_properties,
         query_block = *this->blocks.back();
     }
 
-    return {query_block->get(), query_chunk->get()};
+    return {
+        .allocator = *this,
+        .block = query_block.value(),
+        .chunk = query_chunk.value(),
+    };
 }
 
 } // namespace vkal

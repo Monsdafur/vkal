@@ -14,6 +14,8 @@ struct MemoryAllocatorParams {
     vk::DeviceSize block_size;
 };
 
+struct MemoryAllocatorInfo;
+
 class MemoryAllocator {
   public:
     // No copy and mo move
@@ -26,13 +28,11 @@ class MemoryAllocator {
 
     ~MemoryAllocator() = default;
 
-    std::pair<MemoryBlock&, MemoryChunk&>
-    bind_buffer(vk::Buffer buffer, vk::MemoryPropertyFlags memory_properties,
-                const vk::MemoryRequirements& memory_requirements);
+    MemoryAllocatorInfo bind_buffer(vk::Buffer buffer, vk::MemoryPropertyFlags memory_properties,
+                                    const vk::MemoryRequirements& memory_requirements);
 
-    std::pair<MemoryBlock&, MemoryChunk&>
-    bind_image(vk::Image image, vk::MemoryPropertyFlags memory_properties,
-               const vk::MemoryRequirements& memory_requirements);
+    MemoryAllocatorInfo bind_image(vk::Image image, vk::MemoryPropertyFlags memory_properties,
+                                   const vk::MemoryRequirements& memory_requirements);
 
     void clean(MemoryBlock& block);
 
@@ -43,9 +43,8 @@ class MemoryAllocator {
     void dump();
 
   private:
-    std::pair<MemoryBlock&, MemoryChunk&>
-    query_block(vk::MemoryPropertyFlags memory_properties,
-                const vk::MemoryRequirements& memory_requirements);
+    MemoryAllocatorInfo query_block(vk::MemoryPropertyFlags memory_properties,
+                                    const vk::MemoryRequirements& memory_requirements);
 
     Device& vkal_device;
     vk::DeviceSize block_size;
@@ -61,6 +60,12 @@ class MemoryAllocator {
 
     FRIEND_TEST(MemoryAllocatorTest, AddImage);
     FRIEND_TEST(MemoryAllocatorTest, ImageFail);
+};
+
+struct MemoryAllocatorInfo {
+    MemoryAllocator& allocator;
+    MemoryBlock& block;
+    MemoryChunk& chunk;
 };
 
 using MemoryAllocatorPtr = std::unique_ptr<MemoryAllocator>;
