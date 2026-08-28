@@ -21,7 +21,7 @@ if (UNIX)
 endif()
 add_compile_definitions(SLANG_PRIMARY)
 add_compile_definitions(ENABLE_VALIDATION)
-# add_compile_definitions(ENABLE_DEBUG)
+add_compile_definitions(ENABLE_DEBUG)
 
 # SPIR-V compilation
 find_program(SLANGC NAMES slangc)
@@ -90,10 +90,14 @@ target_link_libraries(memory_allocator_test PUBLIC vkal GTest::gtest_main)
 add_executable(buffer_test tests/buffer_test.cpp)
 target_link_libraries(buffer_test PUBLIC vkal GTest::gtest_main)
 
+add_executable(surface_test tests/surface_test.cpp)
+target_link_libraries(surface_test PUBLIC vkal GTest::gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(device_test)
 gtest_discover_tests(memory_allocator_test)
 gtest_discover_tests(buffer_test)
+gtest_discover_tests(surface_test)
 
 # Add executables
 add_executable(triangle samples/triangle.cpp)
