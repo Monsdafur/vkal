@@ -32,6 +32,8 @@ class Image {
 
     const vk::MemoryRequirements get_memory_requirements() const;
 
+    vk::ImageView get_view() const;
+
     void upload(void* data, vk::DeviceSize size);
 
     void get_raw_data(void* data);

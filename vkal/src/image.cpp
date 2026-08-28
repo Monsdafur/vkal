@@ -39,6 +39,11 @@ const vk::MemoryRequirements Image::get_memory_requirements() const {
 }
 
 ///////////////////////////////////////////////////////////
+vk::ImageView Image::get_view() const {
+    return this->view;
+}
+
+///////////////////////////////////////////////////////////
 vk::Image Image::create_image(const ImageParams& params) {
     vk::ImageCreateInfo image_create_info;
     image_create_info.setImageType(this->type)
