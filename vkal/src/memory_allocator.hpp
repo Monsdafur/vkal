@@ -40,6 +40,8 @@ class MemoryAllocator {
 
     void dump(vk::DeviceSize unit);
 
+    void dump();
+
   private:
     std::pair<MemoryBlock&, MemoryChunk&>
     query_block(vk::MemoryPropertyFlags memory_properties,

@@ -6,18 +6,6 @@
 namespace vkal {
 
 ///////////////////////////////////////////////////////////
-static std::string size_as_string(vk::DeviceSize size) {
-    std::string level[4] = {"B", "KiB", "MB", "GiB"};
-    size_t current_level = 0;
-    while (size >= 1024 && current_level <= 3) {
-        size /= 1024;
-        current_level++;
-    }
-
-    return std::format("{} {}", size, level[current_level]);
-}
-
-///////////////////////////////////////////////////////////
 static uint32_t find_memory_type(vk::PhysicalDevice physical_device, uint32_t filter,
                                  vk::MemoryPropertyFlags properties) {
     vk::PhysicalDeviceMemoryProperties physical_device_memory_properties =
@@ -81,6 +69,15 @@ void MemoryAllocator::dump(vk::DeviceSize unit) {
     for (auto& block : this->blocks) {
         std::print("Block: {}", index++);
         block->dump(unit);
+    }
+}
+
+///////////////////////////////////////////////////////////
+void MemoryAllocator::dump() {
+    size_t index = 0;
+    for (auto& block : this->blocks) {
+        std::print("Block: {}", index++);
+        block->dump();
     }
 }
 

@@ -131,6 +131,20 @@ void MemoryBlock::dump(vk::DeviceSize unit) {
 }
 
 ///////////////////////////////////////////////////////////
+void MemoryBlock::dump() {
+    std::print("|");
+    for (auto* chunk = this->first_chunk.get(); chunk; chunk = chunk->next.get()) {
+        std::string indicator;
+        if (chunk->occupied) {
+            std::print("\033[32m+++ {} +++\033[0m|", size_as_string(chunk->size));
+        } else {
+            std::print("\033[31m--- {} ---\033[0m|", size_as_string(chunk->size));
+        }
+    }
+    std::print("\n");
+}
+
+///////////////////////////////////////////////////////////
 void MemoryBlock::remove_chunk(MemoryChunk& chunk) {
     MemoryChunk* left_chunk = chunk.previous;
     MemoryChunk* right_chunk = chunk.next.get();

@@ -45,6 +45,8 @@ class MemoryBlock {
 
     void dump(vk::DeviceSize unit);
 
+    void dump();
+
   private:
     friend class MemoryAllocator;
 
