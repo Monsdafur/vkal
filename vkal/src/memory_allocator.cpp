@@ -1,8 +1,6 @@
 #include "memory_allocator.hpp"
 #include "common.hpp"
 
-#include <print>
-
 namespace vkal {
 
 ///////////////////////////////////////////////////////////
@@ -68,17 +66,16 @@ void MemoryAllocator::flush() {
 void MemoryAllocator::dump(vk::DeviceSize unit) {
     size_t index = 0;
     for (auto& block : this->blocks) {
-        std::print("Block: {}", index++);
-        block->dump(unit);
+        debug(std::format("Block {} : {}", index++, block->get_dump_info(unit)));
     }
 }
 
 ///////////////////////////////////////////////////////////
 void MemoryAllocator::dump() {
+    debug("Memory allocator changed...");
     size_t index = 0;
     for (auto& block : this->blocks) {
-        std::print("Block: {}", index++);
-        block->dump();
+        debug(std::format("Block {} : {}", index++, block->get_dump_info()));
     }
 }
 
@@ -148,6 +145,10 @@ MemoryAllocator::query_block(vk::MemoryPropertyFlags memory_properties,
         query_chunk = chunk_opt.value();
         query_block = *this->blocks.back();
     }
+
+#if defined(ENABLE_DEBUG)
+    this->dump();
+#endif
 
     return {
         .allocator = *this,

@@ -1,8 +1,6 @@
 #include "memory.hpp"
 #include "common.hpp"
 
-#include <print>
-
 namespace vkal {
 
 ///////////////////////////////////////////////////////////
@@ -84,16 +82,6 @@ void MemoryBlock::map_data(MemoryChunk& chunk, void** data) {
         vk::MemoryPropertyFlagBits::eHostVisible) {
         return;
     }
-    bool found = false;
-    for (auto* current_chunk = this->first_chunk.get(); current_chunk;
-         current_chunk = current_chunk->next.get()) {
-        if (current_chunk == &chunk) {
-            found = true;
-        }
-    }
-    if (!found) {
-        throw std::runtime_error("Memory chunk does not belong to this specific block");
-    }
     *data = (unsigned char*)this->data + chunk.offset;
 }
 
@@ -109,39 +97,30 @@ void MemoryBlock::flush() {
 }
 
 ///////////////////////////////////////////////////////////
-void MemoryBlock::dump(vk::DeviceSize unit) {
-    std::print("|");
+std::string MemoryBlock::get_dump_info(vk::DeviceSize unit) {
+    std::string info = "|";
     for (auto* chunk = this->first_chunk.get(); chunk; chunk = chunk->next.get()) {
-        std::string indicator;
-        if (chunk->occupied) {
-            indicator = "+";
-        } else {
-            indicator = "-";
-        }
         size_t count = chunk->size / unit;
-        for (size_t i = 0; i < count; ++i) {
-            if (i == count - 1) {
-                std::print("|");
-            } else {
-                std::print("{}", indicator);
-            }
-        }
+        std::string indicator;
+        indicator = std::string(count == 0 ? 0 : count - 1, chunk->occupied ? '+' : '-');
+        indicator.push_back('|');
+        info += indicator;
     }
-    std::print("\n");
+
+    return info;
 }
 
 ///////////////////////////////////////////////////////////
-void MemoryBlock::dump() {
-    std::print("|");
+std::string MemoryBlock::get_dump_info() {
+    std::string info = "|";
     for (auto* chunk = this->first_chunk.get(); chunk; chunk = chunk->next.get()) {
-        std::string indicator;
         if (chunk->occupied) {
-            std::print("\033[32m+++ {} +++\033[0m|", size_as_string(chunk->size));
+            info += std::format("\033[32m+++ {} +++\033[0m|", size_as_string(chunk->size));
         } else {
-            std::print("\033[31m--- {} ---\033[0m|", size_as_string(chunk->size));
+            info += std::format("\033[31m--- {} ---\033[0m|", size_as_string(chunk->size));
         }
     }
-    std::print("\n");
+    return info;
 }
 
 ///////////////////////////////////////////////////////////

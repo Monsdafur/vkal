@@ -18,6 +18,9 @@ Buffer::~Buffer() {
     // Sync with memory allocator data
     this->allocator_info.block.remove_chunk(this->allocator_info.chunk);
     this->allocator_info.allocator.clean(this->allocator_info.block);
+#if defined(ENABLE_DEBUG)
+    this->allocator_info.allocator.dump();
+#endif
 }
 
 ///////////////////////////////////////////////////////////

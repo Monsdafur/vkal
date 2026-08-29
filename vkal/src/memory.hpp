@@ -43,9 +43,9 @@ class MemoryBlock {
 
     void remove_chunk(MemoryChunk& chunk);
 
-    void dump(vk::DeviceSize unit);
+    std::string get_dump_info(vk::DeviceSize unit);
 
-    void dump();
+    std::string get_dump_info();
 
   private:
     friend class MemoryAllocator;

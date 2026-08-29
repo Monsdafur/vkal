@@ -13,6 +13,7 @@ struct ImageParams {
     vk::ImageViewType view_type;
     vk::Extent3D extent;
     vk::Format format;
+    vk::SampleCountFlagBits sample_count;
     vk::ImageAspectFlags aspects;
     uint32_t mip_levels;
     vk::ImageUsageFlags usage;
@@ -43,6 +44,10 @@ class Image {
     ~Image();
 
     const vk::MemoryRequirements get_memory_requirements() const;
+
+    vk::Image get();
+
+    vk::Extent3D get_extent() const;
 
     vk::ImageView get_view() const;
 

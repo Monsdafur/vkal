@@ -32,12 +32,24 @@ Image::~Image() {
         // Sync with memory allocator data
         this->allocator_info->block.remove_chunk(this->allocator_info->chunk);
         this->allocator_info->allocator.clean(this->allocator_info->block);
+#if defined(ENABLE_DEBUG)
+        this->allocator_info->allocator.dump();
+#endif
     }
 }
 
 ///////////////////////////////////////////////////////////
 const vk::MemoryRequirements Image::get_memory_requirements() const {
     return this->memory_requirements;
+}
+
+///////////////////////////////////////////////////////////
+vk::Image Image::get() {
+    return this->image;
+}
+
+vk::Extent3D Image::get_extent() const {
+    return this->extent;
 }
 
 ///////////////////////////////////////////////////////////
@@ -53,6 +65,7 @@ vk::Image Image::create_image(const ImageParams& params) {
         .setFormat(this->format)
         .setMipLevels(this->mip_levels)
         .setUsage(params.usage)
+        .setSamples(params.sample_count)
         .setArrayLayers(1)
         .setSharingMode(vk::SharingMode::eExclusive)
         .setTiling(vk::ImageTiling::eOptimal);
