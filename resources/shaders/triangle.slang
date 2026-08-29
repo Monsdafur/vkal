@@ -13,12 +13,19 @@ struct VertexOutput {
 }
 
 // Custom structs
+struct Uniform {
+    float4x4 rotation;
+}
+
+// Descriptors
+[[vk::binding(0, 0)]]
+ConstantBuffer<Uniform> ubo;
 
 // Vertex shader
 [shader("vertex")]
 VertexOutput vertMain(VertexInput input) {
     VertexOutput output;
-    output.position = float4(input.position, 0.0);
+    output.position = mul(ubo.rotation, float4(input.position, 1.0));
     output.color = input.color;
     return output;
 }
