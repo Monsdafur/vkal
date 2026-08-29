@@ -29,6 +29,14 @@ class Surface {
 
     ~Surface();
 
+    vk::Semaphore& get_current_semaphore();
+
+    void set_resize_callback(std::function<void(vk::Extent2D)> callback);
+
+    std::optional<std::reference_wrapper<Image>> acquire_next_frame(vk::Semaphore& semaphore);
+
+    void present();
+
   private:
     void create_surface();
 

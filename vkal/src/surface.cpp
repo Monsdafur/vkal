@@ -90,6 +90,91 @@ Surface::~Surface() {
 }
 
 ///////////////////////////////////////////////////////////
+vk::Semaphore& Surface::get_current_semaphore() {
+    return this->semaphores.at(this->image_index);
+}
+
+///////////////////////////////////////////////////////////
+void Surface::set_resize_callback(std::function<void(vk::Extent2D)> callback) {
+    this->resize_callback = callback;
+}
+
+///////////////////////////////////////////////////////////
+std::optional<std::reference_wrapper<Image>> Surface::acquire_next_frame(vk::Semaphore& semaphore) {
+    uint32_t window_flags = SDL_GetWindowFlags(window);
+    if (window_flags & SDL_WINDOW_MINIMIZED) {
+        return std::nullopt;
+    }
+
+    this->acquire_info.setSemaphore(semaphore);
+
+    vk::Result acquire_result;
+    try {
+        vk::ResultValue<uint32_t> acquire_result_value =
+            this->vkal_device.get().acquireNextImage2KHR(this->acquire_info);
+        this->image_index = acquire_result_value.value;
+        acquire_result = acquire_result_value.result;
+    } catch (const vk::OutOfDateKHRError& e) {
+        acquire_result = vk::Result::eErrorOutOfDateKHR;
+    }
+
+#if defined(ENABLE_DEBUG)
+    if (acquire_result != vk::Result::eSuccess) {
+        debug(std::format("Image acquire result: {}", vk::to_string(acquire_result)));
+    }
+#endif
+
+    switch (acquire_result) {
+    case vk::Result::eNotReady:
+        return std::nullopt;
+    case vk::Result::eSuccess:
+        return *this->images[this->image_index];
+    case vk::Result::eSuboptimalKHR:
+    case vk::Result::eErrorOutOfDateKHR:
+        this->vkal_device.get().waitIdle();
+        this->update_surface_capabilities();
+        this->create_swapchain();
+        return std::nullopt;
+    default:
+        throw std::runtime_error(std::format("Failed to acquire next image with with code {}",
+                                             vk::to_string(acquire_result)));
+    }
+}
+
+///////////////////////////////////////////////////////////
+void Surface::present() {
+    this->present_info.setWaitSemaphores(this->semaphores[this->image_index]);
+    this->present_info.setImageIndices(this->image_index);
+
+    vk::Result present_result;
+    try {
+        present_result = this->present_queue.presentKHR(this->present_info);
+    } catch (const vk::OutOfDateKHRError& e) {
+        present_result = vk::Result::eErrorOutOfDateKHR;
+    }
+
+#if defined(ENABLE_DEBUG)
+    if (present_result != vk::Result::eSuccess) {
+        debug(std::format("Present result: {}", vk::to_string(present_result)));
+    }
+#endif
+
+    switch (present_result) {
+    case vk::Result::eSuccess:
+        break;
+    case vk::Result::eSuboptimalKHR:
+    case vk::Result::eErrorOutOfDateKHR:
+        this->vkal_device.get().waitIdle();
+        this->update_surface_capabilities();
+        this->create_swapchain();
+        break;
+    default:
+        throw std::runtime_error(std::format("Failed to present image with with code {}",
+                                             vk::to_string(present_result)));
+    }
+}
+
+///////////////////////////////////////////////////////////
 void Surface::create_surface() {
     VkSurfaceKHR surface_handler = nullptr;
     SDL_Vulkan_CreateSurface(this->window, this->vkal_instance.get(), nullptr, &surface_handler);
@@ -128,7 +213,6 @@ void Surface::setup_surface_settings(const SurfaceParams& params) {
 
 ///////////////////////////////////////////////////////////
 void Surface::create_swapchain() {
-
     // Create swapchain
     vk::SwapchainCreateInfoKHR swapchain_create_info;
     swapchain_create_info.setSurface(this->surface)
@@ -148,13 +232,20 @@ void Surface::create_swapchain() {
         swapchain_create_info.setOldSwapchain(this->swapchain);
     }
 
+    vk::SwapchainKHR new_swapchain =
+        this->vkal_device.get().createSwapchainKHR(swapchain_create_info);
+    if (this->initialized) {
+        this->vkal_device.get().destroySwapchainKHR(this->swapchain);
+    }
+    this->swapchain = new_swapchain;
+
     this->initialized = true;
-    this->swapchain = this->vkal_device.get().createSwapchainKHR(swapchain_create_info);
 
     // Create frame resources
     this->images.clear();
-    std::vector<vk::Image> images = this->vkal_device.get().getSwapchainImagesKHR(this->swapchain);
-    for (vk::Image& image : images) {
+    std::vector<vk::Image> swapchain_images =
+        this->vkal_device.get().getSwapchainImagesKHR(this->swapchain);
+    for (vk::Image& image : swapchain_images) {
         ImagePtr vkal_image =
             swapchain_image_ptr(SwapchainImageParams{.vkal_device = this->vkal_device,
                                                      .image = image,
