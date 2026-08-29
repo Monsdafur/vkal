@@ -87,7 +87,8 @@ Pipeline::Pipeline(const GraphicsPipelineParams& params)
 
     // Multisample
     vk::PipelineMultisampleStateCreateInfo pipeline_multisample_state_create_info;
-    pipeline_multisample_state_create_info.setRasterizationSamples(vk::SampleCountFlagBits::e1)
+    pipeline_multisample_state_create_info
+        .setRasterizationSamples(params.rasterization_sample_count)
         .setSampleShadingEnable(false);
 
     // Depth stencil

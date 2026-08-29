@@ -19,6 +19,7 @@ struct GraphicsPipelineParams {
     PipelineLayout& vkal_layout;
     std::vector<ShaderStage> shader_stages;
     std::vector<vk::Format> color_attachment_formats;
+    vk::SampleCountFlagBits rasterization_sample_count;
     vk::VertexInputRate vertex_input_rate;
     vk::DeviceSize vertex_stride;
     std::vector<vk::VertexInputAttributeDescription> vertex_descriptions;
