@@ -93,11 +93,15 @@ target_link_libraries(buffer_test PUBLIC vkal GTest::gtest_main)
 add_executable(surface_test tests/surface_test.cpp)
 target_link_libraries(surface_test PUBLIC vkal GTest::gtest_main)
 
+add_executable(render_graph_test tests/render_graph_test.cpp)
+target_link_libraries(render_graph_test PUBLIC vkal GTest::gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(device_test)
 gtest_discover_tests(memory_allocator_test)
 gtest_discover_tests(buffer_test)
 gtest_discover_tests(surface_test)
+gtest_discover_tests(render_graph_test)
 
 # Add executables
 add_executable(triangle samples/triangle.cpp)
