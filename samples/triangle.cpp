@@ -237,8 +237,8 @@ int main() {
         // Create descriptor sets
         vkal::DescriptorPtr vkal_descriptor = vkal::descriptor_ptr(vkal::DescriptorParams{
             .vkal_device = *vkal_device,
-            .max_sets = 1,
-            .pool_sizes = {vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1)},
+            .max_sets = 10,
+            .pool_size = 10,
         });
 
         vkal::DescriptorSetPtr vkal_descriptor_set =
