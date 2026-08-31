@@ -19,7 +19,7 @@ std::vector<RenderGraph::Node> RenderGraph::generate_graph() {
     for (size_t i = 0; i < this->pass_params.size(); ++i) {
         const RenderPassParams& pass = this->pass_params[i];
         Node node;
-        node.pass_imdex = i;
+        node.pass_index = i;
         for (size_t j = 0; j < this->pass_params.size(); ++j) {
             if (i == j) {
                 continue;
@@ -60,7 +60,7 @@ RenderGraph::prune(const std::vector<Node>& nodes) {
 
     // Find root node
     for (const Node& node : nodes) {
-        if (this->pass_params[node.pass_imdex].is_root) {
+        if (this->pass_params[node.pass_index].is_root) {
             stack.push_back(node);
         }
     }
@@ -69,10 +69,10 @@ RenderGraph::prune(const std::vector<Node>& nodes) {
     while (!stack.empty()) {
         Node node = stack.back();
         stack.pop_back();
-        if (visited.contains(node.pass_imdex)) {
+        if (visited.contains(node.pass_index)) {
             continue;
         }
-        visited.emplace(node.pass_imdex);
+        visited.emplace(node.pass_index);
         dfs.push_back({node, node.ins.size()});
         for (size_t in_index : node.ins) {
             if (!visited.contains(in_index)) {
@@ -104,14 +104,14 @@ void RenderGraph::topology_sort(std::vector<std::pair<Node, size_t>>& nodes) {
             if (entry.second == 0) {
                 for (size_t index : entry.first.outs) {
                     for (auto& entry_other : nodes) {
-                        if (entry_other.first.pass_imdex == index) {
+                        if (entry_other.first.pass_index == index) {
                             entry_other.second--;
                             break;
                         }
                     }
                 }
 
-                this->pass_order.push_back(this->pass_params[entry.first.pass_imdex]);
+                this->pass_order.push_back(this->pass_params[entry.first.pass_index]);
                 nodes.erase(nodes.begin() + i);
                 break;
             }

@@ -45,7 +45,7 @@ class RenderGraph {
 
   private:
     struct Node {
-        size_t pass_imdex;
+        size_t pass_index;
         std::vector<size_t> ins;
         std::vector<size_t> outs;
     };
