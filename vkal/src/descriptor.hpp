@@ -1,17 +1,31 @@
 #pragma once
 
+#include "descriptor_layout.hpp"
 #include "device.hpp"
 
+#include <gtest/gtest_prod.h>
+
 #include <cstdint>
-#include <map>
 #include <memory>
 
 namespace vkal {
 
+struct Pool {
+    vk::DescriptorPool pool;
+    uint32_t remaining_sets;
+    std::vector<vk::DescriptorPoolSize> pool_sizes;
+};
+
+struct DescriptorPoolInfo {
+    Pool& pool;
+    std::vector<size_t> pool_size_indices;
+    std::vector<vk::DescriptorPoolSize> pool_sizes;
+};
+
 struct DescriptorParams {
     Device& vkal_device;
     uint32_t max_sets;
-    std::vector<vk::DescriptorPoolSize> pool_sizes;
+    uint32_t pool_size;
 };
 
 class Descriptor {
@@ -26,13 +40,26 @@ class Descriptor {
 
     ~Descriptor();
 
-    vk::DescriptorPool get();
+    DescriptorPoolInfo
+    get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>& layouts);
+
+    void clean(Pool& pool);
+
+    void dump();
 
   private:
     Device& vkal_device;
-    uint32_t set_count;
-    std::map<vk::DescriptorType, uint32_t> pool_sizes;
-    vk::DescriptorPool pool;
+    uint32_t max_sets;
+    uint32_t pool_size;
+    std::vector<std::unique_ptr<Pool>> pools;
+
+    FRIEND_TEST(DescriptorTest, GetPool);
+    FRIEND_TEST(DescriptorTest, GetPoolFail);
+    FRIEND_TEST(DescriptorTest, GetMultiplePools);
+    FRIEND_TEST(DescriptorTest, GetMultipleUnfit);
+    FRIEND_TEST(DescriptorTest, FreeSet);
+    FRIEND_TEST(DescriptorTest, FreeSetSharedPool);
+    FRIEND_TEST(DescriptorTest, FreeSetSeparatePool);
 };
 
 using DescriptorPtr = std::unique_ptr<Descriptor>;

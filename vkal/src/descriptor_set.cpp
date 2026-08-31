@@ -1,18 +1,20 @@
 #include "descriptor_set.hpp"
+#include "common.hpp"
 
 namespace vkal {
 
 ///////////////////////////////////////////////////////////
 DescriptorSet::DescriptorSet(const DescriptorSetParams& params)
     : vkal_device(params.vkal_device), vkal_descriptor_layouts(params.vkal_layouts),
-      vkal_descriptor(params.vkal_descriptor) {
+      vkal_descriptor(params.vkal_descriptor),
+      pool_info(this->vkal_descriptor.get_pool(this->vkal_descriptor_layouts)) {
     std::vector<vk::DescriptorSetLayout> descriptor_layouts;
     for (DescriptorLayout& layout : this->vkal_descriptor_layouts) {
         descriptor_layouts.push_back(layout.get());
     }
 
     vk::DescriptorSetAllocateInfo set_allocate_info;
-    set_allocate_info.setDescriptorPool(this->vkal_descriptor.get())
+    set_allocate_info.setDescriptorPool(this->pool_info.pool.pool)
         .setSetLayouts(descriptor_layouts);
     vk::DescriptorSetVariableDescriptorCountAllocateInfo variable_descriptor_set_info;
     if (params.enable_dynamic_sized_array) {
@@ -21,12 +23,29 @@ DescriptorSet::DescriptorSet(const DescriptorSetParams& params)
         set_allocate_info.pNext = variable_descriptor_set_info;
     }
 
+#if defined(ENABLE_DEBUG)
+    debug("Descriptor changed...");
+    this->vkal_descriptor.dump();
+#endif
+
     this->sets = this->vkal_device.get().allocateDescriptorSets(set_allocate_info);
 }
 
 ///////////////////////////////////////////////////////////
 DescriptorSet::~DescriptorSet() {
-    this->vkal_device.get().freeDescriptorSets(this->vkal_descriptor.get(), this->sets);
+    this->vkal_device.get().freeDescriptorSets(this->pool_info.pool.pool, this->sets);
+    for (size_t i = 0; i < this->pool_info.pool_size_indices.size(); ++i) {
+        size_t index = this->pool_info.pool_size_indices[i];
+        this->pool_info.pool.pool_sizes[index].descriptorCount +=
+            this->pool_info.pool_sizes[i].descriptorCount;
+    }
+    this->pool_info.pool.remaining_sets++;
+    this->vkal_descriptor.clean(this->pool_info.pool);
+
+#if defined(ENABLE_DEBUG)
+    debug("Descriptor changed...");
+    this->vkal_descriptor.dump();
+#endif
 }
 
 ///////////////////////////////////////////////////////////

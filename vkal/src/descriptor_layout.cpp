@@ -27,4 +27,9 @@ vk::DescriptorSetLayout DescriptorLayout::get() {
     return this->layout;
 }
 
+///////////////////////////////////////////////////////////
+const std::vector<vk::DescriptorSetLayoutBinding> DescriptorLayout::get_bindings() {
+    return this->bindings;
+}
+
 } // namespace vkal

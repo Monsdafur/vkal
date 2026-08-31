@@ -66,6 +66,7 @@ class DescriptorSet {
     Device& vkal_device;
     std::vector<std::reference_wrapper<DescriptorLayout>> vkal_descriptor_layouts;
     Descriptor& vkal_descriptor;
+    DescriptorPoolInfo pool_info;
     std::vector<vk::DescriptorSet> sets;
 };
 
