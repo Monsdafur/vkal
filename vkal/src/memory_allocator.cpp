@@ -1,6 +1,8 @@
 #include "memory_allocator.hpp"
 #include "common.hpp"
 
+#include <ranges>
+
 namespace vkal {
 
 ///////////////////////////////////////////////////////////
@@ -64,27 +66,25 @@ void MemoryAllocator::flush() {
 
 ///////////////////////////////////////////////////////////
 void MemoryAllocator::dump(vk::DeviceSize unit) {
-    size_t index = 0;
-    for (auto& block : this->blocks) {
-        debug(std::format("Block {} : {}", index++, block->get_dump_info(unit)));
+    for (const auto& [index, block] : std::ranges::views::enumerate(this->blocks)) {
+        debug(std::format("Block {} : {}", index, block->get_dump_info(unit)));
     }
 }
 
 ///////////////////////////////////////////////////////////
 void MemoryAllocator::dump() {
     debug("Memory allocator changed...");
-    size_t index = 0;
-    for (auto& block : this->blocks) {
-        debug(std::format("Block {} : {}", index++, block->get_dump_info()));
+    for (const auto& [index, block] : std::ranges::views::enumerate(this->blocks)) {
+        debug(std::format("Block {} : {}", index, block->get_dump_info()));
     }
 }
 
 ///////////////////////////////////////////////////////////
 void MemoryAllocator::clean(MemoryBlock& block) {
     if (block.chunk_count == 1 && !block.first_chunk->occupied) {
-        for (size_t i = 0; i < this->blocks.size(); ++i) {
-            if (this->blocks.at(i).get() == &block) {
-                this->blocks.erase(this->blocks.begin() + i);
+        for (auto it = this->blocks.begin(); it != this->blocks.end(); ++it) {
+            if (it->get() == &block) {
+                this->blocks.erase(it);
                 return;
             }
         }

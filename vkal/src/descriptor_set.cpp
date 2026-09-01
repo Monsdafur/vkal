@@ -1,6 +1,8 @@
 #include "descriptor_set.hpp"
 #include "common.hpp"
 
+#include <ranges>
+
 namespace vkal {
 
 ///////////////////////////////////////////////////////////
@@ -34,10 +36,10 @@ DescriptorSet::DescriptorSet(const DescriptorSetParams& params)
 ///////////////////////////////////////////////////////////
 DescriptorSet::~DescriptorSet() {
     this->vkal_device.get().freeDescriptorSets(this->pool_info.pool.pool, this->sets);
-    for (size_t i = 0; i < this->pool_info.pool_size_indices.size(); ++i) {
-        size_t index = this->pool_info.pool_size_indices[i];
-        this->pool_info.pool.pool_sizes[index].descriptorCount +=
-            this->pool_info.pool_sizes[i].descriptorCount;
+    for (const auto& [index, pool_index] :
+         std::ranges::views::enumerate(this->pool_info.pool_size_indices)) {
+        this->pool_info.pool.pool_sizes[pool_index].descriptorCount +=
+            this->pool_info.pool_sizes[index].descriptorCount;
     }
     this->pool_info.pool.remaining_sets++;
     this->vkal_descriptor.clean(this->pool_info.pool);
@@ -79,6 +81,7 @@ void DescriptorSet::write_sampler(const SamplerWriteParams& write_params) {
             "Cannot write to descriptor as both image and sampler are invalid");
     }
 
+    // Enumerate through both images and sampler
     std::vector<vk::DescriptorImageInfo> descriptor_image_infos;
     for (size_t i = 0; i < std::max(write_params.images.size(), write_params.samplers.size());
          ++i) {

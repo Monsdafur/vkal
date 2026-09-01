@@ -1,8 +1,8 @@
 #include "device.hpp"
 #include "common.hpp"
-#include "vulkan/vulkan.hpp"
 
 #include <cstdint>
+#include <ranges>
 #include <stdexcept>
 #include <vector>
 
@@ -97,12 +97,10 @@ const vk::PhysicalDeviceProperties& Device::get_properties() const {
 
 ///////////////////////////////////////////////////////////
 uint32_t Device::get_queue_index(vk::QueueFlags queue_flags) {
-    uint32_t index = 0;
-    for (auto& properties : this->queue_properties) {
+    for (const auto& [index, properties] : std::ranges::views::enumerate(this->queue_properties)) {
         if ((properties.queueFlags & queue_flags) == queue_flags) {
             return index;
         }
-        index++;
     }
 
     throw std::runtime_error("Failed to find any queue index with matching flags");
@@ -115,9 +113,9 @@ vk::Queue Device::get_queue(uint32_t index) {
 
 ///////////////////////////////////////////////////////////
 vk::Queue Device::get_present_queue(const vk::SurfaceKHR& surface) {
-    for (size_t i = 0; i < this->queue_properties.size(); ++i) {
-        if (this->physical_device.getSurfaceSupportKHR(i, surface)) {
-            return this->queues.at(i);
+    for (const auto& [index, queue] : std::ranges::views::enumerate(this->queues)) {
+        if (this->physical_device.getSurfaceSupportKHR(index, surface)) {
+            return queue;
         }
     }
 
@@ -156,13 +154,12 @@ void Device::create_device(const DeviceParams& params) {
         this->physical_device.getQueueFamilyProperties2();
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos(queue_family_properties.size());
     std::array<float, 1> queue_priorities = {0.5f};
-    uint32_t queue_index = 0;
-    for (auto& queue_create_info : queue_create_infos) {
-        this->queue_properties.push_back(
-            queue_family_properties.at(queue_index).queueFamilyProperties);
+    for (const auto& [index, queue_create_info] :
+         std::ranges::views::enumerate(queue_create_infos)) {
+        this->queue_properties.push_back(queue_family_properties.at(index).queueFamilyProperties);
         queue_create_info.setQueueCount(1)
             .setQueuePriorities(queue_priorities)
-            .setQueueFamilyIndex(queue_index++);
+            .setQueueFamilyIndex(index);
     }
 
     // Add more features to dynamic state if needed

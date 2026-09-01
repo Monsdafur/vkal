@@ -246,12 +246,13 @@ void Surface::create_swapchain() {
     std::vector<vk::Image> swapchain_images =
         this->vkal_device.get().getSwapchainImagesKHR(this->swapchain);
     for (vk::Image& image : swapchain_images) {
-        ImagePtr vkal_image =
-            swapchain_image_ptr(SwapchainImageParams{.vkal_device = this->vkal_device,
-                                                     .image = image,
-                                                     .extent = this->capabilities.currentExtent,
-                                                     .format = this->surface_format.format,
-                                                     .aspects = vk::ImageAspectFlagBits::eColor});
+        ImagePtr vkal_image = swapchain_image_ptr(SwapchainImageParams{
+            .vkal_device = this->vkal_device,
+            .image = image,
+            .extent = this->capabilities.currentExtent,
+            .format = this->surface_format.format,
+            .aspects = vk::ImageAspectFlagBits::eColor,
+        });
         this->images.push_back(std::move(vkal_image));
     }
 

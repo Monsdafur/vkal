@@ -1,6 +1,8 @@
 #include "descriptor.hpp"
 #include "common.hpp"
 
+#include <ranges>
+
 namespace vkal {
 ///////////////////////////////////////////////////////////
 static std::vector<vk::DescriptorPoolSize> collect_descriptor_pool_sizes(
@@ -67,16 +69,10 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
     // Collect all descriptor pool sizes
     std::vector<vk::DescriptorPoolSize> layout_pool_sizes = collect_descriptor_pool_sizes(layouts);
 
-    // Collect all descriptor set layout handles
-    std::vector<vk::DescriptorSetLayout> descriptor_layouts;
-    for (DescriptorLayout& layout : layouts) {
-        descriptor_layouts.push_back(layout.get());
-    }
-
     for (const auto& pool : this->pools) {
         std::vector<size_t> pool_indices =
             match_descriptor_pool_sizes(layout_pool_sizes, pool->pool_sizes);
-        if (pool_indices.size() != layout_pool_sizes.size()) {
+        if (pool_indices.size() != layout_pool_sizes.size() || pool->remaining_sets == 0) {
             continue;
         }
 
@@ -95,6 +91,7 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
     }
 
     // If no suitable descriptor pool is found then create a new one
+    // Create a current pool size list with full capacity
     std::vector<vk::DescriptorPoolSize> current_pool_sizes;
     for (vk::DescriptorPoolSize& pool_size : layout_pool_sizes) {
         if (pool_size.descriptorCount > this->pool_size) {
@@ -121,14 +118,16 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
         this->vkal_device.get().createDescriptorPool(descriptor_pool_create_info);
     this->pools.push_back(std::make_unique<Pool>(Pool{
         .pool = descriptor_pool,
-        .remaining_sets = this->max_sets - 1,
+        .remaining_sets =
+            this->max_sets - 1, // A set is being allocated so the max sets must be decreased by 1
         .pool_sizes = current_pool_sizes,
     }));
 
+    // A new pool is created to accomodate the allocated set so all pool indices matches the set
+    // pool indices
     std::vector<size_t> pool_indices(layout_pool_sizes.size());
-    size_t index = 0;
-    for (size_t& pool_index : pool_indices) {
-        pool_index = index++;
+    for (const auto& [index, pool_index] : std::ranges::views::enumerate(pool_indices)) {
+        pool_index = index;
     }
 
     return DescriptorPoolInfo{
@@ -138,6 +137,7 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
     };
 }
 
+///////////////////////////////////////////////////////////
 void Descriptor::clean(Pool& pool) {
     if (pool.remaining_sets == this->max_sets) {
         for (size_t i = 0; i < this->pools.size(); ++i) {
@@ -151,6 +151,7 @@ void Descriptor::clean(Pool& pool) {
     }
 }
 
+///////////////////////////////////////////////////////////
 void Descriptor::dump() {
     size_t index = 0;
     for (const auto& pool : this->pools) {

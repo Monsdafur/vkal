@@ -9,13 +9,13 @@ namespace vkal {
 struct ImageParams {
     Device& vkal_device;
     MemoryAllocator& memory_allocator;
-    vk::ImageType type;
-    vk::ImageViewType view_type;
+    vk::ImageType type = vk::ImageType::e2D;
+    vk::ImageViewType view_type = vk::ImageViewType::e2D;
     vk::Extent3D extent;
-    vk::Format format;
-    vk::SampleCountFlagBits sample_count;
-    vk::ImageAspectFlags aspects;
-    uint32_t mip_levels;
+    vk::Format format = vk::Format::eR8G8B8A8Srgb;
+    vk::SampleCountFlagBits sample_count = vk::SampleCountFlagBits::e1;
+    vk::ImageAspectFlags aspects = vk::ImageAspectFlagBits::eColor;
+    uint32_t mip_levels = 1;
     vk::ImageUsageFlags usage;
     vk::MemoryPropertyFlags memory_properties;
 };
@@ -26,7 +26,6 @@ struct SwapchainImageParams {
     vk::Extent2D extent;
     vk::Format format;
     vk::ImageAspectFlags aspects;
-    vk::ImageUsageFlags usage;
 };
 
 class Image {

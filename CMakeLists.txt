@@ -21,7 +21,7 @@ if (UNIX)
 endif()
 add_compile_definitions(SLANG_PRIMARY)
 add_compile_definitions(ENABLE_VALIDATION)
-add_compile_definitions(ENABLE_DEBUG)
+# add_compile_definitions(ENABLE_DEBUG)
 
 # SPIR-V compilation
 find_program(SLANGC NAMES slangc)

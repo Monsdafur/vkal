@@ -1,5 +1,6 @@
 #include "render_graph.hpp"
 
+#include <ranges>
 #include <set>
 
 namespace vkal {
@@ -16,23 +17,21 @@ void RenderGraph::add_pass(const RenderPassParams& pass_params) {
 ///////////////////////////////////////////////////////////
 std::vector<RenderGraph::Node> RenderGraph::generate_graph() {
     std::vector<Node> nodes;
-    for (size_t i = 0; i < this->pass_params.size(); ++i) {
-        const RenderPassParams& pass = this->pass_params[i];
+    for (const auto& [index, pass] : std::ranges::views::enumerate(this->pass_params)) {
         Node node;
-        node.pass_index = i;
-        for (size_t j = 0; j < this->pass_params.size(); ++j) {
-            if (i == j) {
+        node.pass_index = index;
+        for (const auto& [other_index, other_pass] :
+             std::ranges::views::enumerate(this->pass_params)) {
+            if (index == other_index) {
                 continue;
             }
-            const RenderPassParams& other_pass = this->pass_params[j];
-
             // Matching to find any matching resource on both passes
             for (const ResourceDescription& resource : pass.write_resources) {
                 if (std::ranges::any_of(other_pass.read_resources,
                                         [&resource](const ResourceDescription& other_resource) {
                                             return resource.identifier == other_resource.identifier;
                                         })) {
-                    node.outs.push_back(j);
+                    node.outs.push_back(other_index);
                 }
             }
 
@@ -41,7 +40,7 @@ std::vector<RenderGraph::Node> RenderGraph::generate_graph() {
                                         [&resource](const ResourceDescription& other_resource) {
                                             return resource.identifier == other_resource.identifier;
                                         })) {
-                    node.ins.push_back(j);
+                    node.ins.push_back(other_index);
                 }
             }
         }
@@ -52,6 +51,7 @@ std::vector<RenderGraph::Node> RenderGraph::generate_graph() {
     return nodes;
 }
 
+///////////////////////////////////////////////////////////
 std::vector<std::pair<RenderGraph::Node, size_t>>
 RenderGraph::prune(const std::vector<Node>& nodes) {
     std::vector<std::pair<RenderGraph::Node, size_t>> dfs;
@@ -80,23 +80,10 @@ RenderGraph::prune(const std::vector<Node>& nodes) {
             }
         }
     }
-
-    std::vector<size_t> keeps;
-    for (auto& pair : dfs) {
-        Node& node = pair.first;
-        // Iterate through all out nodes and remove the ones that were pruned
-        keeps.clear();
-        for (size_t out_index : node.outs) {
-            if (visited.contains(out_index)) {
-                keeps.push_back(out_index);
-            }
-        }
-        node.outs = keeps;
-    }
-
     return dfs;
 }
 
+///////////////////////////////////////////////////////////
 void RenderGraph::topology_sort(std::vector<std::pair<Node, size_t>>& nodes) {
     while (!nodes.empty()) {
         size_t i = 0;
