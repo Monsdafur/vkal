@@ -13,9 +13,9 @@ TEST(RenderGraphTest, GraphGenerationTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass a",
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "A-B&D",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
                 },
@@ -24,13 +24,13 @@ TEST(RenderGraphTest, GraphGenerationTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass b",
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "A-B&D",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "B-C",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
                 },
@@ -39,25 +39,27 @@ TEST(RenderGraphTest, GraphGenerationTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass c",
-        .resources = {ResourceDescription{
-                          .identifier = "B-C",
-                          .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
-                      },
-                      ResourceDescription{
-                          .identifier = "D-C",
-                          .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
-                      }},
+        .buffer_resources = {BufferResourceDescription{
+                                 .identifier = "B-C",
+                                 .barrier =
+                                     ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                             },
+                             BufferResourceDescription{
+                                 .identifier = "D-C",
+                                 .barrier =
+                                     ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                             }},
     });
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass d",
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "A-B&D",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "D-C",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
                 },
@@ -98,9 +100,9 @@ TEST(RenderGraphTest, PruningTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass a",
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "A-B&C",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
                 },
@@ -109,13 +111,13 @@ TEST(RenderGraphTest, PruningTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass b",
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "A-B&C",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "B-r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
                 },
@@ -124,13 +126,13 @@ TEST(RenderGraphTest, PruningTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass c",
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "A-B&C",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "C-D&r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
                 },
@@ -139,9 +141,9 @@ TEST(RenderGraphTest, PruningTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass d",
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "C-D&r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
@@ -151,13 +153,13 @@ TEST(RenderGraphTest, PruningTest) {
     pass_params.push_back(RenderPassParams{
         .identifier = "root pass",
         .is_root = true,
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "B-r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "C-D&r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
@@ -228,13 +230,13 @@ TEST(RenderGraphTest, ToplogySortTest) {
     pass_params.push_back(RenderPassParams{
         .identifier = "root pass",
         .is_root = true,
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "B-r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "C-D&r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
@@ -243,9 +245,9 @@ TEST(RenderGraphTest, ToplogySortTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass a",
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "A-B&C",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
                 },
@@ -254,9 +256,9 @@ TEST(RenderGraphTest, ToplogySortTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass d",
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "C-D&r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
@@ -265,13 +267,13 @@ TEST(RenderGraphTest, ToplogySortTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass b",
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "A-B&C",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "B-r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
                 },
@@ -280,13 +282,13 @@ TEST(RenderGraphTest, ToplogySortTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass c",
-        .resources =
+        .buffer_resources =
             {
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "A-B&C",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
                 },
-                ResourceDescription{
+                BufferResourceDescription{
                     .identifier = "C-D&r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
                 },

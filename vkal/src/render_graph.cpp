@@ -7,17 +7,32 @@
 namespace vkal {
 
 ///////////////////////////////////////////////////////////
-void sort_resource_access(const std::vector<ResourceDescription>& resources,
-                          std::vector<size_t>& read_resources,
-                          std::vector<size_t>& write_resources) {
-    for (const auto& [index, resource] : std::ranges::views::enumerate(resources)) {
+static void
+categorize_buffer_resources(const std::vector<BufferResourceDescription>& buffer_resources,
+                            std::vector<std::pair<size_t, size_t>>& read_resources,
+                            std::vector<std::pair<size_t, size_t>>& write_resources) {
+    for (const auto& [index, resource] : std::ranges::views::enumerate(buffer_resources)) {
         if (!resource.barrier.has_value() ||
             static_cast<bool>(resource.barrier->access & VK_ACCESS_READ_FLAGS)) {
-            read_resources.push_back(index);
+            read_resources.push_back({0, index});
         }
         if (resource.barrier.has_value() &&
             static_cast<bool>(resource.barrier->access & VK_ACCESS_WRITE_FLAGS)) {
-            write_resources.push_back(index);
+            write_resources.push_back({0, index});
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////
+static void categorize_image_resources(const std::vector<ImageResourceDescription>& image_resources,
+                                       std::vector<std::pair<size_t, size_t>>& read_resources,
+                                       std::vector<std::pair<size_t, size_t>>& write_resources) {
+    for (const auto& [index, resource] : std::ranges::views::enumerate(image_resources)) {
+        if (static_cast<bool>(resource.barrier.access & VK_ACCESS_READ_FLAGS)) {
+            read_resources.push_back({1, index});
+        }
+        if (static_cast<bool>(resource.barrier.access & VK_ACCESS_WRITE_FLAGS)) {
+            write_resources.push_back({1, index});
         }
     }
 }
@@ -29,26 +44,43 @@ static std::vector<GraphNode> generate_graph(const std::vector<RenderPassParams>
         GraphNode node;
         node.pass_index = index;
 
-        std::vector<size_t> read_resources;
-        std::vector<size_t> write_resources;
-        sort_resource_access(pass.resources, read_resources, write_resources);
+        // First member of the pair determines the type of the resource
+        // 0 = buffer
+        // 1 = image
+        std::vector<std::pair<size_t, size_t>> read_resources;
+        std::vector<std::pair<size_t, size_t>> write_resources;
+        categorize_buffer_resources(pass.buffer_resources, read_resources, write_resources);
+        categorize_image_resources(pass.image_resources, read_resources, write_resources);
 
         for (const auto& [other_index, other_pass] : std::ranges::views::enumerate(pass_params)) {
             if (index == other_index) {
                 continue;
             }
             // Matching to find any matching resource on both passes
-            std::vector<size_t> other_read_resources;
-            std::vector<size_t> other_write_resources;
-            sort_resource_access(other_pass.resources, other_read_resources, other_write_resources);
+            std::vector<std::pair<size_t, size_t>> other_read_resources;
+            std::vector<std::pair<size_t, size_t>> other_write_resources;
+            categorize_buffer_resources(other_pass.buffer_resources, other_read_resources,
+                                        other_write_resources);
+            categorize_image_resources(other_pass.image_resources, other_read_resources,
+                                       other_write_resources);
 
-            for (size_t write_index : write_resources) {
+            for (const std::pair<size_t, size_t>& write : write_resources) {
                 bool has_dependency = false;
-                for (size_t read_index : other_read_resources) {
-                    if (pass.resources[write_index].identifier ==
-                        other_pass.resources[read_index].identifier) {
-                        has_dependency = true;
-                        break;
+                for (const std::pair<size_t, size_t>& read : other_read_resources) {
+                    if (write.first == read.first) {
+                        if (write.first == 0) {
+                            if (pass.buffer_resources[write.second].identifier ==
+                                other_pass.buffer_resources[read.second].identifier) {
+                                has_dependency = true;
+                                break;
+                            }
+                        } else {
+                            if (pass.image_resources[write.second].identifier ==
+                                other_pass.image_resources[read.second].identifier) {
+                                has_dependency = true;
+                                break;
+                            }
+                        }
                     }
                 }
                 if (has_dependency) {
@@ -56,13 +88,23 @@ static std::vector<GraphNode> generate_graph(const std::vector<RenderPassParams>
                 }
             }
 
-            for (size_t read_index : read_resources) {
+            for (const std::pair<size_t, size_t>& read : read_resources) {
                 bool has_dependency = false;
-                for (size_t write_index : other_write_resources) {
-                    if (pass.resources[read_index].identifier ==
-                        other_pass.resources[write_index].identifier) {
-                        has_dependency = true;
-                        break;
+                for (const std::pair<size_t, size_t>& write : other_write_resources) {
+                    if (read.first == write.first) {
+                        if (read.first == 0) {
+                            if (pass.buffer_resources[read.second].identifier ==
+                                other_pass.buffer_resources[write.second].identifier) {
+                                has_dependency = true;
+                                break;
+                            }
+                        } else {
+                            if (pass.image_resources[read.second].identifier ==
+                                other_pass.image_resources[write.second].identifier) {
+                                has_dependency = true;
+                                break;
+                            }
+                        }
                     }
                 }
                 if (has_dependency) {
@@ -161,8 +203,8 @@ RenderGraph::~RenderGraph() {
 }
 
 ///////////////////////////////////////////////////////////
-void RenderGraph::add_pass(const RenderPassParams& pass_params) {
-    this->pass_params.push_back(pass_params);
+void RenderGraph::add_pass(RenderPassParams pass_params) {
+    this->pass_params.push_back(std::move(pass_params));
 }
 
 ///////////////////////////////////////////////////////////
@@ -177,11 +219,9 @@ void RenderGraph::compile() {
 ///////////////////////////////////////////////////////////
 void RenderGraph::generate_passes() {
     for (size_t pass_index : this->pass_order) {
-        const RenderPassParams& pass_params = this->pass_params[pass_index];
+        RenderPassParams& pass_params = this->pass_params[pass_index];
 
-        std::unique_ptr<RenderPass> pass = std::make_unique<RenderPass>();
-        pass->pre_render_callback = pass_params.pre_render_callback;
-        pass->render_callback = pass_params.render_callback;
+        std::unique_ptr<RenderPassData> pass = std::make_unique<RenderPassData>();
 
         if (pass_params.pipeline.has_value()) {
             pass->pipeline = this->render_resources.get_pipeline(*pass_params.pipeline);
@@ -195,73 +235,87 @@ void RenderGraph::generate_passes() {
         std::unordered_map<std::string, vk::ImageLayout> layouts;
 
         // Collect all buffer and image resources
-        for (const ResourceDescription& resource_description : pass_params.resources) {
-            const std::string& identifier = resource_description.identifier;
-            std::optional<ResourceBarrier> barrier = resource_description.barrier;
+        for (const BufferResourceDescription& buffer_description : pass_params.buffer_resources) {
+            const std::string& identifier = buffer_description.identifier;
+            std::optional<ResourceBarrier> barrier = buffer_description.barrier;
 
-            if (resource_description.type == ResourceDescription::Type::BUFFER) {
-                Buffer& buffer = this->render_resources.get_buffer(identifier);
-                pass->buffer_resources.try_emplace(identifier, buffer);
+            Buffer& buffer = this->render_resources.get_buffer(identifier);
+            pass->buffer_resources.try_emplace(identifier, buffer);
 
-                // Setup barrier if there are any
-                if (barrier.has_value()) {
-                    vk::BufferMemoryBarrier2 buffer_barrier;
-                    buffer_barrier.setBuffer(buffer.get())
-                        .setOffset(0)
-                        .setSize(buffer.get_size())
-                        .setDstAccessMask(barrier->access)
-                        .setDstStageMask(barrier->stage);
-                    pass->buffer_barriers.push_back(buffer_barrier);
-                    pass->buffer_barriers_refs.push_back(buffer);
-                }
+            // Setup barrier if there are any
+            if (barrier.has_value()) {
+                vk::BufferMemoryBarrier2 buffer_barrier;
+                buffer_barrier.setBuffer(buffer.get())
+                    .setOffset(0)
+                    .setSize(buffer.get_size())
+                    .setDstAccessMask(barrier->access)
+                    .setDstStageMask(barrier->stage);
+                pass->buffer_barriers.push_back(buffer_barrier);
+                pass->buffer_barriers_refs.push_back(buffer);
+            }
 
-                // Write to descriptor set if enabled
-                if (pass->descriptor_set != nullptr && resource_description.write_set) {
-                    pass->descriptor_set->write_buffer(BufferWriteParams{
-                        .buffers = {buffer},
-                        .set_index = resource_description.set,
-                        .type = resource_description.descriptor_type,
-                        .binding = resource_description.binding,
-                        .array_size = 1,
-                        .first_element = 0,
-                    });
-                }
-            } else if (resource_description.type == ResourceDescription::Type::IMAGE) {
-                Image& image = this->render_resources.get_image(identifier);
-                pass->image_resources.try_emplace(identifier, image);
+            // Write to descriptor set if enabled
+            if (pass->descriptor_set != nullptr &&
+                buffer_description.resource_rescriptor.has_value()) {
+                pass->descriptor_set->write_buffer(BufferWriteParams{
+                    .buffers = {buffer},
+                    .set_index = buffer_description.resource_rescriptor->set,
+                    .type = buffer_description.resource_rescriptor->type,
+                    .binding = buffer_description.resource_rescriptor->binding,
+                    .array_size = 1,
+                    .first_element = 0,
+                });
+            }
+        }
 
-                // Setup barrier if there are any
-                if (barrier.has_value()) {
-                    vk::ImageMemoryBarrier2 image_barrier;
-                    image_barrier.setImage(image.get())
-                        .setDstAccessMask(barrier->access)
-                        .setDstStageMask(barrier->stage)
-                        .setNewLayout(barrier->layout)
-                        .setSubresourceRange(
-                            vk::ImageSubresourceRange(image.get_aspect(), 0, 1, 0, 1));
-                    pass->image_barriers.push_back(std::move(image_barrier));
-                    pass->image_barriers_refs.push_back(image);
-                    layouts.emplace(identifier, barrier->layout);
-                }
+        for (const ImageResourceDescription& image_description : pass_params.image_resources) {
+            const std::string& identifier = image_description.identifier;
+            ResourceBarrier barrier = image_description.barrier;
 
-                // Write to descriptor set if enabled
-                if (pass->descriptor_set != nullptr && resource_description.write_set) {
-                    pass->descriptor_set->write_sampler(SamplerWriteParams{
-                        .images = {image},
-                        .set_index = resource_description.set,
-                        .type = resource_description.descriptor_type,
-                        .binding = resource_description.binding,
-                        .array_size = 1,
-                        .first_element = 0,
-                    });
-                }
+            Image& image = this->render_resources.get_image(identifier);
+            pass->image_resources.try_emplace(identifier, image);
+
+            // Setup image barrier
+            vk::ImageMemoryBarrier2 image_barrier;
+            image_barrier.setImage(image.get())
+                .setDstAccessMask(barrier.access)
+                .setDstStageMask(barrier.stage)
+                .setNewLayout(barrier.layout)
+                .setSubresourceRange(vk::ImageSubresourceRange(image.get_aspect(), 0, 1, 0, 1));
+            pass->image_barriers.push_back(std::move(image_barrier));
+            pass->image_barriers_refs.push_back(image);
+            layouts.emplace(identifier, barrier.layout);
+
+            // Write to descriptor set if enabled
+            if (pass->descriptor_set != nullptr &&
+                image_description.resource_rescriptor.has_value()) {
+                pass->descriptor_set->write_sampler(SamplerWriteParams{
+                    .images = {image},
+                    .layout = barrier.layout,
+                    .set_index = image_description.resource_rescriptor->set,
+                    .type = image_description.resource_rescriptor->type,
+                    .binding = image_description.resource_rescriptor->binding,
+                    .array_size = 1,
+                    .first_element = 0,
+                });
             }
         }
 
         // Collect all sampler resources
-        for (const std::string& identifier : pass_params.samplers) {
-            pass->sampler_resources.try_emplace(identifier,
-                                                this->render_resources.get_sampler(identifier));
+        for (const SamplerResource& sampler_resources : pass_params.samplers_resources) {
+            const std::string& identifier = sampler_resources.identifier;
+            Sampler& sampler = this->render_resources.get_sampler(identifier);
+            if (pass->descriptor_set != nullptr) {
+                pass->descriptor_set->write_sampler(SamplerWriteParams{
+                    .samplers = {sampler},
+                    .set_index = sampler_resources.set,
+                    .type = vk::DescriptorType::eSampler,
+                    .binding = sampler_resources.binding,
+                    .array_size = 1,
+                    .first_element = 0,
+                });
+            }
+            pass->sampler_resources.try_emplace(identifier, sampler);
         }
 
         // Create a dependency info if there are resource barriers
@@ -300,12 +354,18 @@ void RenderGraph::generate_passes() {
                     .setResolveImageView(image.get_view())
                     .setResolveImageLayout(layouts.at(attachment_params.resolve_image));
                 pass->render_attachments.push_back(render_attachment);
+                pass->render_attachments_refs.emplace(attachment_params.identifier,
+                                                      pass->render_attachments.back());
                 pass->attachment_images.push_back(image);
             }
             pass->rendering_info.setLayerCount(1).setColorAttachments(pass->render_attachments);
         }
 
-        this->passes.push_back(std::move(pass));
+        pass->pass = std::move(pass_params.pass);
+        pass->pass->setup_metadata(pass->buffer_resources, pass->image_resources,
+                                   pass->render_attachments_refs, pass->pipeline,
+                                   *pass->descriptor_set);
+        this->pass_data.push_back(std::move(pass));
     }
 }
 
@@ -326,7 +386,7 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
     command.reset();
     command.begin(vk::CommandBufferBeginInfo());
 
-    for (std::unique_ptr<RenderPass>& pass : this->passes) {
+    for (std::unique_ptr<RenderPassData>& pass : this->pass_data) {
         // Pre render barriers
         if (pass->dependency_info.has_value()) {
             for (const auto& [index, buffer_barrier] :
@@ -377,12 +437,7 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
         }
 
         command.beginRendering(pass->rendering_info);
-        pass->pre_render_callback(pass->viewport, pass->scissor);
-        command.setViewport(0, pass->viewport);
-        command.setScissor(0, pass->scissor);
-        pass->render_callback(command, pass->buffer_resources, pass->image_resources,
-                              pass->pipeline, *pass->descriptor_set);
-
+        pass->pass->render(command);
         command.endRendering();
 
         // Post render barriers

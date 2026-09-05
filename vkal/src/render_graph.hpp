@@ -1,6 +1,7 @@
 #pragma once
 
 #include "descriptor_set.hpp"
+#include "render_pass.hpp"
 #include "render_resources.hpp"
 #include "surface.hpp"
 
@@ -24,6 +25,7 @@ struct RenderAttachmentParams {
         DEPTH,
     };
 
+    std::string identifier;
     std::string resolve_image;
     std::string image;
     vk::ResolveModeFlags resolve_mode;
@@ -32,37 +34,42 @@ struct RenderAttachmentParams {
     vk::AttachmentStoreOp store_op;
 };
 
-struct ResourceDescription {
-    enum Type {
-        BUFFER,
-        IMAGE,
-    };
-
-    Type type;
-    std::string identifier;
-    std::optional<ResourceBarrier> barrier;
-    bool write_set = false;
+struct ResourceDescriptor {
+    vk::DescriptorType type;
     uint32_t set;
     uint32_t binding;
-    vk::DescriptorType descriptor_type;
+};
+
+struct BufferResourceDescription {
+    std::string identifier;
+    std::optional<ResourceBarrier> barrier;
+    std::optional<ResourceDescriptor> resource_rescriptor;
+};
+
+struct ImageResourceDescription {
+    std::string identifier;
+    ResourceBarrier barrier; // A barrier is a must for an image resource
+    std::optional<ResourceDescriptor> resource_rescriptor;
+};
+
+struct SamplerResource {
+    std::string identifier;
+    uint32_t set;
+    uint32_t binding;
 };
 
 struct RenderPassParams {
     std::string identifier;
     bool is_root = false;
 
-    std::vector<ResourceDescription> resources;
+    std::vector<BufferResourceDescription> buffer_resources;
+    std::vector<ImageResourceDescription> image_resources;
     std::vector<RenderAttachmentParams> render_attachments;
-    std::vector<std::string> samplers;
+    std::vector<SamplerResource> samplers_resources;
 
     std::optional<std::string> pipeline;
 
-    std::function<void(vk::Viewport&, vk::Rect2D&)> pre_render_callback;
-    std::function<void(vk::CommandBuffer,
-                       const std::unordered_map<std::string, std::reference_wrapper<Buffer>>&,
-                       const std::unordered_map<std::string, std::reference_wrapper<Image>>&,
-                       std::optional<std::reference_wrapper<Pipeline>>, DescriptorSet&)>
-        render_callback;
+    std::unique_ptr<RenderPass> pass;
 };
 
 struct RenderGraphParams {
@@ -78,7 +85,7 @@ struct GraphNode {
     std::vector<size_t> outs;
 };
 
-struct RenderPass {
+struct RenderPassData {
     std::optional<std::reference_wrapper<Pipeline>> pipeline;
     DescriptorSetPtr descriptor_set;
 
@@ -87,6 +94,8 @@ struct RenderPass {
     std::unordered_map<std::string, std::reference_wrapper<Sampler>> sampler_resources;
 
     std::vector<vk::RenderingAttachmentInfo> render_attachments;
+    std::unordered_map<std::string, std::reference_wrapper<vk::RenderingAttachmentInfo>>
+        render_attachments_refs;
     std::vector<std::reference_wrapper<Image>> attachment_images;
     vk::RenderingAttachmentInfo swapchain_attachment;
     vk::RenderingInfo rendering_info;
@@ -100,15 +109,7 @@ struct RenderPass {
     std::optional<vk::DependencyInfo> dependency_info;
     std::optional<vk::DependencyInfo> swapchain_depedency_info;
 
-    vk::Viewport viewport;
-    vk::Rect2D scissor;
-
-    std::function<void(vk::Viewport&, vk::Rect2D&)> pre_render_callback;
-    std::function<void(vk::CommandBuffer,
-                       const std::unordered_map<std::string, std::reference_wrapper<Buffer>>&,
-                       const std::unordered_map<std::string, std::reference_wrapper<Image>>&,
-                       std::optional<std::reference_wrapper<Pipeline>>, DescriptorSet&)>
-        render_callback;
+    std::unique_ptr<RenderPass> pass;
 };
 
 class RenderGraph {
@@ -123,7 +124,7 @@ class RenderGraph {
 
     ~RenderGraph();
 
-    void add_pass(const RenderPassParams& pass_params);
+    void add_pass(RenderPassParams pass_params);
 
     void compile();
 
@@ -148,7 +149,7 @@ class RenderGraph {
 
     std::vector<RenderPassParams> pass_params;
     std::vector<size_t> pass_order;
-    std::vector<std::unique_ptr<RenderPass>> passes;
+    std::vector<std::unique_ptr<RenderPassData>> pass_data;
 
     vk::CommandBufferSubmitInfo command_submit_info;
     vk::SemaphoreSubmitInfo wait_semaphore_info;

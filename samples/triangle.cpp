@@ -28,39 +28,57 @@ struct Uniform {
     glm::mat4 rotation;
 };
 
-void pre_render(vk::Viewport& viewport, vk::Rect2D& scissor) {
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(WINDOW_EXTENT.width);
-    viewport.height = static_cast<float>(WINDOW_EXTENT.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    scissor.offset.x = 0;
-    scissor.offset.y = 0;
-    scissor.extent = WINDOW_EXTENT;
-}
-
-void render(vk::CommandBuffer command,
-            const std::unordered_map<std::string, std::reference_wrapper<vkal::Buffer>>& buffers,
-            const std::unordered_map<std::string, std::reference_wrapper<vkal::Image>>& images,
-            std::optional<std::reference_wrapper<vkal::Pipeline>> pipeline,
-            vkal::DescriptorSet& descriptor_sets) {
-    if (!pipeline.has_value()) {
-        return;
+class VertexColorPass : public vkal::RenderPass {
+  public:
+    virtual void setup_metadata(
+        const std::unordered_map<std::string, std::reference_wrapper<vkal::Buffer>>& buffers,
+        const std::unordered_map<std::string, std::reference_wrapper<vkal::Image>>& images,
+        const std::unordered_map<std::string, std::reference_wrapper<vk::RenderingAttachmentInfo>>&
+            render_attachments,
+        std::optional<std::reference_wrapper<vkal::Pipeline>> pipeline_opt,
+        std::optional<std::reference_wrapper<vkal::DescriptorSet>> descriptor_sets_opt) override {
+        this->vertex_buffer = &buffers.at("vertex buffer").get();
+        this->index_buffer = &buffers.at("index buffer").get();
+        if (pipeline_opt.has_value()) {
+            this->pipeline = &pipeline_opt->get();
+            if (descriptor_sets_opt.has_value()) {
+                this->descriptor_sets = &descriptor_sets_opt->get();
+            }
+        }
     }
-    vkal::Buffer& vertex_buffer = buffers.at("vertex buffer");
-    vkal::Buffer& index_buffer = buffers.at("index buffer");
 
-    vkal::Pipeline& graphics_pipeline = *pipeline;
-    command.bindPipeline(graphics_pipeline.get_bind_point(), graphics_pipeline.get());
-    vk::DescriptorSet set = descriptor_sets.get(0);
-    command.bindDescriptorSets2(vk::BindDescriptorSetsInfo(
-        vk::ShaderStageFlagBits::eVertex, graphics_pipeline.get_layout().get(), 0, 1, &set, 0));
-    command.bindVertexBuffers2(0, vertex_buffer.get(), {0});
-    command.bindIndexBuffer2(index_buffer.get(), 0, index_buffer.get_size(),
-                             vk::IndexType::eUint32);
-    command.drawIndexed(3, 1, 0, 0, 0);
-}
+    virtual void render(vk::CommandBuffer command) override {
+        this->viewport.x = 0.0f;
+        this->viewport.y = 0.0f;
+        this->viewport.width = static_cast<float>(WINDOW_EXTENT.width);
+        this->viewport.height = static_cast<float>(WINDOW_EXTENT.height);
+        this->viewport.minDepth = 0.0f;
+        this->viewport.maxDepth = 1.0f;
+        this->scissor.offset.x = 0;
+        this->scissor.offset.y = 0;
+        this->scissor.extent = WINDOW_EXTENT;
+        command.setViewport(0, this->viewport);
+        command.setScissor(0, this->scissor);
+
+        vkal::Pipeline& graphics_pipeline = *pipeline;
+        command.bindPipeline(graphics_pipeline.get_bind_point(), graphics_pipeline.get());
+        vk::DescriptorSet set = descriptor_sets->get(0);
+        command.bindDescriptorSets2(vk::BindDescriptorSetsInfo(
+            vk::ShaderStageFlagBits::eVertex, graphics_pipeline.get_layout().get(), 0, 1, &set, 0));
+        command.bindVertexBuffers2(0, vertex_buffer->get(), {0});
+        command.bindIndexBuffer2(index_buffer->get(), 0, index_buffer->get_size(),
+                                 vk::IndexType::eUint32);
+        command.drawIndexed(3, 1, 0, 0, 0);
+    }
+
+  private:
+    vk::Viewport viewport;
+    vk::Rect2D scissor;
+    vkal::Buffer* vertex_buffer;
+    vkal::Buffer* index_buffer;
+    vkal::Pipeline* pipeline;
+    vkal::DescriptorSet* descriptor_sets;
+};
 
 int main() {
     try {
@@ -195,32 +213,29 @@ int main() {
         Uniform uniform = {.rotation = glm::mat4(1.0f)};
 
         // Create vertex buffer
-        render_resources.create_buffer(vkal::BufferResourceParams{
+        vkal::Buffer& vertex_buffer = render_resources.create_buffer(vkal::BufferResourceParams{
             .identifier = "vertex buffer",
             .size = sizeof(Vertex) * vertices.size(),
             .usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
             .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         });
-        vkal::Buffer& vertex_buffer = render_resources.get_buffer("vertex buffer");
 
         // Create index buffer
-        render_resources.create_buffer(vkal::BufferResourceParams{
+        vkal::Buffer& index_buffer = render_resources.create_buffer(vkal::BufferResourceParams{
             .identifier = "index buffer",
             .size = sizeof(uint32_t) * indices.size(),
             .usage = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
             .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         });
-        vkal::Buffer& index_buffer = render_resources.get_buffer("index buffer");
 
         // Craete uniform buffer
-        render_resources.create_buffer(vkal::BufferResourceParams{
+        vkal::Buffer& uniform_buffer = render_resources.create_buffer(vkal::BufferResourceParams{
             .identifier = "uniform buffer",
             .size = sizeof(Uniform),
             .usage = vk::BufferUsageFlagBits::eUniformBuffer,
             .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible |
                                  vk::MemoryPropertyFlagBits::eHostCoherent,
         });
-        vkal::Buffer& uniform_buffer = render_resources.get_buffer("uniform buffer");
 
         {
             vkal::BufferPtr staging0 = vkal::buffer_ptr(vkal::BufferParams{
@@ -274,36 +289,35 @@ int main() {
         });
 
         {
-            std::vector<vkal::ResourceDescription> resrouces_descriptions;
-            resrouces_descriptions.push_back(vkal::ResourceDescription{
-                .type = vkal::ResourceDescription::Type::BUFFER,
+            std::vector<vkal::BufferResourceDescription> resrouces_descriptions;
+            resrouces_descriptions.push_back(vkal::BufferResourceDescription{
                 .identifier = "vertex buffer",
             });
-            resrouces_descriptions.push_back(vkal::ResourceDescription{
-                .type = vkal::ResourceDescription::Type::BUFFER,
+            resrouces_descriptions.push_back(vkal::BufferResourceDescription{
                 .identifier = "index buffer",
             });
-            resrouces_descriptions.push_back(vkal::ResourceDescription{
-                .type = vkal::ResourceDescription::Type::BUFFER,
+            resrouces_descriptions.push_back(vkal::BufferResourceDescription{
                 .identifier = "uniform buffer",
                 .barrier =
                     vkal::ResourceBarrier{
                         .access = vk::AccessFlagBits2::eShaderRead,
                         .stage = vk::PipelineStageFlagBits2::eVertexShader,
                     },
-                .write_set = true,
-                .set = 0,
-                .binding = 0,
-                .descriptor_type = vk::DescriptorType::eUniformBuffer,
+                .resource_rescriptor =
+                    vkal::ResourceDescriptor{
+                        .type = vk::DescriptorType::eUniformBuffer,
+                        .set = 0,
+                        .binding = 0,
+                    },
             });
-            render_graph->add_pass(vkal::RenderPassParams{
+            vkal::RenderPassParams pass_params{
                 .identifier = "final pass",
                 .is_root = true,
-                .resources = resrouces_descriptions,
+                .buffer_resources = resrouces_descriptions,
                 .pipeline = "graphics pipeline",
-                .pre_render_callback = pre_render,
-                .render_callback = render,
-            });
+                .pass = std::make_unique<VertexColorPass>(),
+            };
+            render_graph->add_pass(std::move(pass_params));
         }
 
         render_graph->compile();
