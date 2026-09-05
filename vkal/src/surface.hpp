@@ -33,9 +33,13 @@ class Surface {
 
     void set_resize_callback(std::function<void(vk::Extent2D)> callback);
 
-    std::optional<std::reference_wrapper<Image>> acquire_next_frame(vk::Semaphore& semaphore);
+    std::optional<uint32_t> acquire_next_frame(vk::Semaphore semaphore);
 
     void present();
+
+    size_t get_image_count() const;
+
+    Image& get_image(size_t index);
 
   private:
     void create_surface();

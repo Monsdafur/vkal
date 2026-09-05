@@ -100,7 +100,7 @@ void Surface::set_resize_callback(std::function<void(vk::Extent2D)> callback) {
 }
 
 ///////////////////////////////////////////////////////////
-std::optional<std::reference_wrapper<Image>> Surface::acquire_next_frame(vk::Semaphore& semaphore) {
+std::optional<uint32_t> Surface::acquire_next_frame(vk::Semaphore semaphore) {
     uint32_t window_flags = SDL_GetWindowFlags(window);
     if (window_flags & SDL_WINDOW_MINIMIZED) {
         return std::nullopt;
@@ -128,7 +128,7 @@ std::optional<std::reference_wrapper<Image>> Surface::acquire_next_frame(vk::Sem
     case vk::Result::eNotReady:
         return std::nullopt;
     case vk::Result::eSuccess:
-        return *this->images[this->image_index];
+        return this->image_index;
     case vk::Result::eSuboptimalKHR:
     case vk::Result::eErrorOutOfDateKHR:
         this->vkal_device.get().waitIdle();
@@ -271,6 +271,16 @@ void Surface::create_swapchain() {
     for (size_t i = 0; i < this->images.size(); ++i) {
         this->semaphores.push_back(this->vkal_device.get().createSemaphore(semaphore_create_info));
     }
+}
+
+///////////////////////////////////////////////////////////
+size_t Surface::get_image_count() const {
+    return this->image_count;
+}
+
+///////////////////////////////////////////////////////////
+Image& Surface::get_image(size_t index) {
+    return *this->images.at(index);
 }
 
 } // namespace vkal
