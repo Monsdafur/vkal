@@ -42,6 +42,9 @@ class Image {
 
     ~Image();
 
+    void set_barrier(vk::ImageLayout layout, vk::AccessFlags2 access, vk::PipelineStageFlags2 stage,
+                     uint32_t target_mip = 0, uint32_t mip_count = 1);
+
     const vk::MemoryRequirements get_memory_requirements() const;
 
     vk::Image get();
@@ -55,6 +58,10 @@ class Image {
     void get_raw_data(void* data);
 
     vk::ImageAspectFlags get_aspect();
+
+    vk::AccessFlags2 get_access(size_t index);
+
+    vk::PipelineStageFlags2 get_stage(size_t index);
 
   private:
     vk::Image create_image(const ImageParams& params);
@@ -78,6 +85,8 @@ class Image {
     std::optional<MemoryAllocatorInfo> allocator_info;
     vk::ImageView view;
     void* data;
+    std::vector<vk::AccessFlags2> access;
+    std::vector<vk::PipelineStageFlags2> stage;
 
     // Test
     FRIEND_TEST(MemoryAllocatorTest, AddImage);

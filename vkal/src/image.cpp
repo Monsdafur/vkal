@@ -39,6 +39,15 @@ Image::~Image() {
 }
 
 ///////////////////////////////////////////////////////////
+void Image::set_barrier(vk::ImageLayout layout, vk::AccessFlags2 access,
+                        vk::PipelineStageFlags2 stage, uint32_t target_mip, uint32_t mip_count) {
+    for (size_t i = target_mip; i < target_mip + mip_count; ++i) {
+        this->access[i] = access;
+        this->stage[i] = stage;
+    }
+}
+
+///////////////////////////////////////////////////////////
 const vk::MemoryRequirements Image::get_memory_requirements() const {
     return this->memory_requirements;
 }
@@ -102,6 +111,11 @@ void Image::get_raw_data(void* data) {
 }
 
 ///////////////////////////////////////////////////////////
+vk::ImageAspectFlags Image::get_aspect() {
+    return this->aspects;
+}
+
+///////////////////////////////////////////////////////////
 vk::ImageView Image::create_view() {
     vk::ImageViewCreateInfo image_view_create_info;
 
@@ -125,6 +139,16 @@ vk::ImageView Image::create_view() {
         .setSubresourceRange(sub_resource_range);
 
     return this->vkal_device.get().createImageView(image_view_create_info);
+}
+
+///////////////////////////////////////////////////////////
+vk::AccessFlags2 Image::get_access(size_t index) {
+    return this->access[index];
+}
+
+///////////////////////////////////////////////////////////
+vk::PipelineStageFlags2 Image::get_stage(size_t index) {
+    return this->stage[index];
 }
 
 } // namespace vkal
