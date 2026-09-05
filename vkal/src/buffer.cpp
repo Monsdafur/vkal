@@ -29,6 +29,12 @@ vk::Buffer Buffer::get() {
 }
 
 ///////////////////////////////////////////////////////////
+void Buffer::set_barrier(vk::AccessFlags2 access, vk::PipelineStageFlags2 stage) {
+    this->access = access;
+    this->stage = stage;
+}
+
+///////////////////////////////////////////////////////////
 const vk::MemoryRequirements Buffer::get_memory_requirements() const {
     return this->memory_requirements;
 }
@@ -74,6 +80,16 @@ vk::MemoryRequirements Buffer::get_requirements() {
     return this->vkal_device.get()
         .getBufferMemoryRequirements2(memory_requirements_info)
         .memoryRequirements;
+}
+
+///////////////////////////////////////////////////////////
+vk::AccessFlags2 Buffer::get_access() {
+    return this->access;
+}
+
+///////////////////////////////////////////////////////////
+vk::PipelineStageFlags2 Buffer::get_stage() {
+    return this->stage;
 }
 
 } // namespace vkal

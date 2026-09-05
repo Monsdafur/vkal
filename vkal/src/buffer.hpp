@@ -26,6 +26,8 @@ class Buffer {
 
     ~Buffer();
 
+    void set_barrier(vk::AccessFlags2 access, vk::PipelineStageFlags2 stage);
+
     vk::Buffer get();
 
     const vk::MemoryRequirements get_memory_requirements() const;
@@ -35,6 +37,10 @@ class Buffer {
     void get_raw_data(void* data);
 
     vk::DeviceSize get_size();
+
+    vk::AccessFlags2 get_access();
+
+    vk::PipelineStageFlags2 get_stage();
 
   private:
     vk::Buffer create_buffer(const BufferParams& params);
@@ -47,6 +53,8 @@ class Buffer {
     vk::MemoryRequirements memory_requirements;
     MemoryAllocatorInfo allocator_info;
     void* data;
+    vk::AccessFlags2 access;
+    vk::PipelineStageFlags2 stage;
 
     // Test
     FRIEND_TEST(MemoryAllocatorTest, AddBufferHostVisible);
