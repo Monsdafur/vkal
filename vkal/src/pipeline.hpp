@@ -29,7 +29,6 @@ struct GraphicsPipelineParams {
 struct ComputePipelineParams {
     Device& vkal_device;
     PipelineLayout& vkal_layout;
-    Device& vk2d_device;
     ShaderStage shader_stage;
 };
 

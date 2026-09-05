@@ -191,7 +191,7 @@ Pipeline::Pipeline(const ComputePipelineParams& params)
 
     // Shader stage
     vk::ShaderModule shader_module =
-        create_shader_module(params.vk2d_device.get(), params.shader_stage.file_path);
+        create_shader_module(params.vkal_device.get(), params.shader_stage.file_path);
     vk::PipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
     pipeline_shader_stage_create_info.setStage(params.shader_stage.stage).setModule(shader_module);
 
