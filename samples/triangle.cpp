@@ -2,11 +2,11 @@
 #include "../vkal/src/command.hpp"
 #include "../vkal/src/common.hpp"
 #include "../vkal/src/descriptor.hpp"
-#include "../vkal/src/descriptor_set.hpp"
 #include "../vkal/src/device.hpp"
-#include "../vkal/src/image.hpp"
 #include "../vkal/src/instance.hpp"
 #include "../vkal/src/pipeline.hpp"
+#include "../vkal/src/render_graph.hpp"
+#include "../vkal/src/render_resources.hpp"
 #include "../vkal/src/surface.hpp"
 
 #include <SDL3/SDL.h>
@@ -27,6 +27,40 @@ struct Vertex {
 struct Uniform {
     glm::mat4 rotation;
 };
+
+void pre_render(vk::Viewport& viewport, vk::Rect2D& scissor) {
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(WINDOW_EXTENT.width);
+    viewport.height = static_cast<float>(WINDOW_EXTENT.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    scissor.extent = WINDOW_EXTENT;
+}
+
+void render(vk::CommandBuffer command,
+            const std::unordered_map<std::string, std::reference_wrapper<vkal::Buffer>>& buffers,
+            const std::unordered_map<std::string, std::reference_wrapper<vkal::Image>>& images,
+            std::optional<std::reference_wrapper<vkal::Pipeline>> pipeline,
+            vkal::DescriptorSet& descriptor_sets) {
+    if (!pipeline.has_value()) {
+        return;
+    }
+    vkal::Buffer& vertex_buffer = buffers.at("vertex buffer");
+    vkal::Buffer& index_buffer = buffers.at("index buffer");
+
+    vkal::Pipeline& graphics_pipeline = *pipeline;
+    command.bindPipeline(graphics_pipeline.get_bind_point(), graphics_pipeline.get());
+    vk::DescriptorSet set = descriptor_sets.get(0);
+    command.bindDescriptorSets2(vk::BindDescriptorSetsInfo(
+        vk::ShaderStageFlagBits::eVertex, graphics_pipeline.get_layout().get(), 0, 1, &set, 0));
+    command.bindVertexBuffers2(0, vertex_buffer.get(), {0});
+    command.bindIndexBuffer2(index_buffer.get(), 0, index_buffer.get_size(),
+                             vk::IndexType::eUint32);
+    command.drawIndexed(3, 1, 0, 0, 0);
+}
 
 int main() {
     try {
@@ -69,7 +103,7 @@ int main() {
             .present_modes =
                 {
                     vk::PresentModeKHR::eFifo,
-                    vk::PresentModeKHR::eFifoLatestReady,
+                    vk::PresentModeKHR::eImmediate,
                     vk::PresentModeKHR::eMailbox,
                 },
         });
@@ -81,29 +115,40 @@ int main() {
                 .block_size = vkal::megabytes(128),
             });
 
+        // Craete descriptor
+        vkal::DescriptorPtr vkal_descriptor = vkal::descriptor_ptr(vkal::DescriptorParams{
+            .vkal_device = *vkal_device,
+            .max_sets = 10,
+            .pool_size = 10,
+        });
+
+        // Create graphics resource manager
+        vkal::RenderResources render_resources(vkal::RenderResourcesParams{
+            .vkal_device = *vkal_device,
+            .memory_allocator = *memory_allocator,
+        });
+
         // Create descriptor layout
-        vkal::DescriptorLayoutPtr vkal_descriptor_layout =
-            vkal::descriptor_layout_ptr(vkal::DescriptorLayoutParams{
-                .vkal_device = *vkal_device,
-                .bindings =
-                    {
-                        vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
-                                                       vk::ShaderStageFlagBits::eVertex),
-                    },
-                .binding_flags = {vk::DescriptorBindingFlags()},
-            });
+        render_resources.create_descriptor_layout(vkal::DescriptorLayoutResourceParams{
+            .identifier = "default descriptor layout",
+            .bindings =
+                {
+                    vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
+                                                   vk::ShaderStageFlagBits::eVertex),
+                },
+            .binding_flags = {vk::DescriptorBindingFlags()},
+        });
 
         // Create graphcis pipeline
-        vkal::PipelineLayoutPtr vkal_pipeline_layout =
-            vkal::pipeline_layout_ptr(vkal::PipelineLayoutParams{
-                .vkal_device = *vkal_device,
-                .vkal_descriptor_layouts = {*vkal_descriptor_layout},
-            });
+        render_resources.create_pipeline_layout(vkal::PipelineLayoutResourceParams{
+            .identifier = "default pipeline layout",
+            .descriptor_layout_identifiers = {"default descriptor layout"},
+        });
 
-        vkal::PipelinePtr vkal_graphics_pipeline =
-            vkal::graphics_pipeline_ptr(vkal::GraphicsPipelineParams{
-                .vkal_device = *vkal_device,
-                .vkal_layout = *vkal_pipeline_layout,
+        vkal::Pipeline& vkal_graphics_pipeline =
+            render_resources.create_graphics_pipeline(vkal::GraphicsPipelineResourceParams{
+                .identifier = "graphics pipeline",
+                .layout_identifier = "default pipeline layout",
                 .shader_stages =
                     {
                         vkal::ShaderStage{
@@ -116,7 +161,7 @@ int main() {
                         },
                     },
                 .color_attachment_formats = {vk::Format::eB8G8R8A8Srgb},
-                .rasterization_sample_count = vk::SampleCountFlagBits::e4,
+                .rasterization_sample_count = vk::SampleCountFlagBits::e1,
                 .vertex_input_rate = vk::VertexInputRate::eVertex,
                 .vertex_stride = sizeof(Vertex),
                 .vertex_descriptions =
@@ -150,32 +195,32 @@ int main() {
         Uniform uniform = {.rotation = glm::mat4(1.0f)};
 
         // Create vertex buffer
-        vkal::BufferPtr vertex_buffer = vkal::buffer_ptr(vkal::BufferParams{
-            .vkal_device = *vkal_device,
-            .memory_allocator = *memory_allocator,
+        render_resources.create_buffer(vkal::BufferResourceParams{
+            .identifier = "vertex buffer",
             .size = sizeof(Vertex) * vertices.size(),
             .usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
             .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         });
+        vkal::Buffer& vertex_buffer = render_resources.get_buffer("vertex buffer");
 
         // Create index buffer
-        vkal::BufferPtr index_buffer = vkal::buffer_ptr(vkal::BufferParams{
-            .vkal_device = *vkal_device,
-            .memory_allocator = *memory_allocator,
+        render_resources.create_buffer(vkal::BufferResourceParams{
+            .identifier = "index buffer",
             .size = sizeof(uint32_t) * indices.size(),
             .usage = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
             .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         });
+        vkal::Buffer& index_buffer = render_resources.get_buffer("index buffer");
 
         // Craete uniform buffer
-        vkal::BufferPtr uniform_buffer = vkal::buffer_ptr(vkal::BufferParams{
-            .vkal_device = *vkal_device,
-            .memory_allocator = *memory_allocator,
+        render_resources.create_buffer(vkal::BufferResourceParams{
+            .identifier = "uniform buffer",
             .size = sizeof(Uniform),
             .usage = vk::BufferUsageFlagBits::eUniformBuffer,
             .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible |
                                  vk::MemoryPropertyFlagBits::eHostCoherent,
         });
+        vkal::Buffer& uniform_buffer = render_resources.get_buffer("uniform buffer");
 
         {
             vkal::BufferPtr staging0 = vkal::buffer_ptr(vkal::BufferParams{
@@ -199,15 +244,15 @@ int main() {
 
             command.begin(vk::CommandBufferBeginInfo());
             vk::BufferCopy2 region;
-            region.setSrcOffset(0).setDstOffset(0).setSize(vertex_buffer->get_size());
+            region.setSrcOffset(0).setDstOffset(0).setSize(vertex_buffer.get_size());
             vk::CopyBufferInfo2 copy_buffer_info;
             copy_buffer_info.setSrcBuffer(staging0->get())
-                .setDstBuffer(vertex_buffer->get())
+                .setDstBuffer(vertex_buffer.get())
                 .setRegions(region);
 
             command.copyBuffer2(copy_buffer_info);
-            region.setSize(index_buffer->get_size());
-            copy_buffer_info.setSrcBuffer(staging1->get()).setDstBuffer(index_buffer->get());
+            region.setSize(index_buffer.get_size());
+            copy_buffer_info.setSrcBuffer(staging1->get()).setDstBuffer(index_buffer.get());
             command.copyBuffer2(copy_buffer_info);
 
             command.end();
@@ -220,130 +265,51 @@ int main() {
             queue.waitIdle();
         }
 
-        vkal::ImagePtr msaa = vkal::image_ptr(vkal::ImageParams{
+        // Render graph
+        vkal::RenderGraphPtr render_graph = vkal::render_graph_ptr(vkal::RenderGraphParams{
             .vkal_device = *vkal_device,
-            .memory_allocator = *memory_allocator,
-            .type = vk::ImageType::e2D,
-            .view_type = vk::ImageViewType::e2D,
-            .extent = vk::Extent3D(WINDOW_EXTENT, 1),
-            .format = vk::Format::eB8G8R8A8Srgb,
-            .sample_count = vk::SampleCountFlagBits::e4,
-            .aspects = vk::ImageAspectFlagBits::eColor,
-            .mip_levels = 1,
-            .usage = vk::ImageUsageFlagBits::eColorAttachment,
-            .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+            .vkal_surface = *vkal_surface,
+            .render_resources = render_resources,
+            .vkal_descriptor = *vkal_descriptor,
         });
 
-        // Create descriptor sets
-        vkal::DescriptorPtr vkal_descriptor = vkal::descriptor_ptr(vkal::DescriptorParams{
-            .vkal_device = *vkal_device,
-            .max_sets = 10,
-            .pool_size = 10,
-        });
-
-        vkal::DescriptorSetPtr vkal_descriptor_set =
-            vkal::descriptor_set_ptr(vkal::DescriptorSetParams{
-                .vkal_device = *vkal_device,
-                .vkal_layouts = {*vkal_descriptor_layout},
-                .vkal_descriptor = *vkal_descriptor,
+        {
+            std::vector<vkal::ResourceDescription> resrouces_descriptions;
+            resrouces_descriptions.push_back(vkal::ResourceDescription{
+                .type = vkal::ResourceDescription::Type::BUFFER,
+                .identifier = "vertex buffer",
             });
+            resrouces_descriptions.push_back(vkal::ResourceDescription{
+                .type = vkal::ResourceDescription::Type::BUFFER,
+                .identifier = "index buffer",
+            });
+            resrouces_descriptions.push_back(vkal::ResourceDescription{
+                .type = vkal::ResourceDescription::Type::BUFFER,
+                .identifier = "uniform buffer",
+                .barrier =
+                    vkal::ResourceBarrier{
+                        .access = vk::AccessFlagBits2::eShaderRead,
+                        .stage = vk::PipelineStageFlagBits2::eVertexShader,
+                    },
+                .write_set = true,
+                .set = 0,
+                .binding = 0,
+                .descriptor_type = vk::DescriptorType::eUniformBuffer,
+            });
+            render_graph->add_pass(vkal::RenderPassParams{
+                .identifier = "final pass",
+                .is_root = true,
+                .resources = resrouces_descriptions,
+                .pipeline = "graphics pipeline",
+                .pre_render_callback = pre_render,
+                .render_callback = render,
+            });
+        }
 
-        vkal_descriptor_set->write_buffer(vkal::BufferWriteParams{
-            .buffers = {*uniform_buffer},
-            .set_index = 0,
-            .type = vk::DescriptorType::eUniformBuffer,
-            .binding = 0,
-        });
+        render_graph->compile();
 
-        // Create fence and semaphore
-        vk::Fence fence =
-            vkal_device->get().createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
-        vk::Semaphore semaphore = vkal_device->get().createSemaphore(vk::SemaphoreCreateInfo());
-
-        vk::RenderingAttachmentInfo rendering_attachment;
-        rendering_attachment.setImageView(msaa->get_view())
-            .setResolveMode(vk::ResolveModeFlagBits::eAverage)
-            .setClearValue(vk::ClearColorValue(std::array<float, 4>{0.01f, 0.01f, 0.01f, 1.0f}))
-            .setLoadOp(vk::AttachmentLoadOp::eClear)
-            .setStoreOp(vk::AttachmentStoreOp::eStore)
-            .setImageLayout(vk::ImageLayout::eColorAttachmentOptimal)
-            .setResolveImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
-
-        vk::RenderingInfo rendering_info;
-        rendering_info.setColorAttachments(rendering_attachment).setLayerCount(1);
-
-        vk::Viewport viewport(0, 0, WINDOW_EXTENT.width, WINDOW_EXTENT.height, 0.0, 1.0);
-        vk::Rect2D scissor(vk::Offset2D(0, 0), WINDOW_EXTENT);
-
-        vk::ImageSubresourceRange sub_resource_range;
-        sub_resource_range.setAspectMask(vk::ImageAspectFlagBits::eColor)
-            .setBaseMipLevel(0)
-            .setLevelCount(1)
-            .setBaseArrayLayer(0)
-            .setLayerCount(1);
-
-        vk::ImageMemoryBarrier2 present_pre_barrier;
-        present_pre_barrier.setOldLayout(vk::ImageLayout::eUndefined)
-            .setNewLayout(vk::ImageLayout::eColorAttachmentOptimal)
-            .setSrcAccessMask(vk::AccessFlagBits2::eNone)
-            .setDstAccessMask(vk::AccessFlagBits2::eColorAttachmentWrite)
-            .setSrcStageMask(vk::PipelineStageFlagBits2::eNone)
-            .setDstStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput)
-            .setSubresourceRange(sub_resource_range);
-
-        vk::ImageMemoryBarrier2 present_post_barrier;
-        present_post_barrier.setOldLayout(present_pre_barrier.newLayout)
-            .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
-            .setSrcAccessMask(present_pre_barrier.dstAccessMask)
-            .setDstAccessMask(vk::AccessFlagBits2::eNone)
-            .setSrcStageMask(present_pre_barrier.dstStageMask)
-            .setDstStageMask(vk::PipelineStageFlagBits2::eBottomOfPipe)
-            .setSubresourceRange(sub_resource_range);
-
-        vk::ImageMemoryBarrier2 msaa_pre_barrier;
-        msaa_pre_barrier.setImage(msaa->get())
-            .setOldLayout(vk::ImageLayout::eUndefined)
-            .setNewLayout(vk::ImageLayout::eColorAttachmentOptimal)
-            .setSrcAccessMask(vk::AccessFlagBits2::eNone)
-            .setDstAccessMask(vk::AccessFlagBits2::eColorAttachmentWrite)
-            .setSrcStageMask(vk::PipelineStageFlagBits2::eNone)
-            .setDstStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput)
-            .setSubresourceRange(sub_resource_range);
-
-        vk::DependencyInfo dependency_info;
-
-        vk::SemaphoreSubmitInfo signal_semaphore_info;
-        vk::SemaphoreSubmitInfo wait_semaphore_info;
-        vk::CommandBufferSubmitInfo command_submit_info;
-        command_submit_info.setCommandBuffer(vkal_command->get(0)).setDeviceMask(1);
-        wait_semaphore_info.setSemaphore(semaphore).setStageMask(
-            vk::PipelineStageFlagBits2::eColorAttachmentOutput);
-        vk::SubmitInfo2 submit_info;
-        submit_info.setCommandBufferInfos(command_submit_info)
-            .setWaitSemaphoreInfos(wait_semaphore_info)
-            .setSignalSemaphoreInfos(signal_semaphore_info);
-
-        vkal_surface->set_resize_callback([&msaa, &vkal_device, &memory_allocator,
-                                           &msaa_pre_barrier,
-                                           &rendering_attachment](vk::Extent2D extent) {
-            if (extent != vk::Extent2D(msaa->get_extent().width, msaa->get_extent().height)) {
-                msaa = vkal::image_ptr(vkal::ImageParams{
-                    .vkal_device = *vkal_device,
-                    .memory_allocator = *memory_allocator,
-                    .type = vk::ImageType::e2D,
-                    .view_type = vk::ImageViewType::e2D,
-                    .extent = vk::Extent3D(extent, 1),
-                    .format = vk::Format::eB8G8R8A8Srgb,
-                    .sample_count = vk::SampleCountFlagBits::e4,
-                    .aspects = vk::ImageAspectFlagBits::eColor,
-                    .mip_levels = 1,
-                    .usage = vk::ImageUsageFlagBits::eColorAttachment,
-                    .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
-                });
-                msaa_pre_barrier.setImage(msaa->get());
-                rendering_attachment.setImageView(msaa->get_view());
-            }
-        });
+        vkal_surface->set_resize_callback(
+            [&render_graph](vk::Extent2D extent) { render_graph->reset_swapchain_images(); });
 
         // Main loop
         SDL_Event event;
@@ -363,62 +329,21 @@ int main() {
 
             float t = SDL_GetTicks() / 1000.0f;
             uniform.rotation = glm::rotate(glm::mat4(1.0f), t, glm::vec3(0.0f, 0.0f, 1.0f));
-            uniform_buffer->upload(&uniform, sizeof(Uniform));
+            uniform_buffer.upload(&uniform, sizeof(Uniform));
 
-            vk::Result wait_result = vkal_device->get().waitForFences(fence, true, UINT64_MAX);
-            if (wait_result != vk::Result::eSuccess) {
-                throw std::runtime_error(
-                    std::format("Failed to wait for fence due to {}", vk::to_string(wait_result)));
-            }
-
-            auto image_opt = vkal_surface->acquire_next_frame(semaphore);
-            if (!image_opt.has_value()) {
+            render_graph->sync();
+            std::optional<uint32_t> swapchain_index_opt =
+                vkal_surface->acquire_next_frame(render_graph->get_semaphore());
+            if (!swapchain_index_opt.has_value()) {
                 continue;
             }
-            vkal_device->get().resetFences(fence);
-            vkal::Image& image = image_opt.value();
-            rendering_info.setRenderArea(
-                vk::Rect2D(vk::Offset2D(0, 0),
-                           vk::Extent2D(image.get_extent().width, image.get_extent().height)));
-            rendering_attachment.setResolveImageView(image.get_view());
-            present_pre_barrier.setImage(image.get());
-            present_post_barrier.setImage(image.get());
-            std::array<vk::ImageMemoryBarrier2, 2> pre_barriers = {present_pre_barrier,
-                                                                   msaa_pre_barrier};
-            dependency_info.setImageMemoryBarriers(pre_barriers);
-            signal_semaphore_info.setSemaphore(vkal_surface->get_current_semaphore());
 
-            command.begin(vk::CommandBufferBeginInfo());
-            command.pipelineBarrier2(dependency_info);
-            command.beginRendering(rendering_info);
-
-            // Begin render
-            command.setViewport(0, viewport);
-            command.setScissor(0, scissor);
-            command.bindPipeline(vkal_graphics_pipeline->get_bind_point(),
-                                 vkal_graphics_pipeline->get());
-            command.bindDescriptorSets(vkal_graphics_pipeline->get_bind_point(),
-                                       vkal_graphics_pipeline->get_layout().get(), 0,
-                                       vkal_descriptor_set->get(0), {});
-            command.bindVertexBuffers(0, vertex_buffer->get(), {0});
-            command.bindIndexBuffer(index_buffer->get(), 0, vk::IndexType::eUint32);
-            command.drawIndexed(3, 1, 0, 0, 0);
-            // End render
-
-            command.endRendering();
-            dependency_info.setImageMemoryBarriers(present_post_barrier);
-            command.pipelineBarrier2(dependency_info);
-            command.end();
-
-            queue.submit2(submit_info, fence);
-
+            render_graph->execute(*swapchain_index_opt, queue, command,
+                                  vkal_surface->get_current_semaphore());
             vkal_surface->present();
         }
 
         vkal_device->get().waitIdle();
-        vkal_device->get().destroySemaphore(semaphore);
-        vkal_device->get().destroyFence(fence);
-
         SDL_Quit();
     } catch (const std::exception& e) {
         std::println("ERROR  | {}", e.what());
