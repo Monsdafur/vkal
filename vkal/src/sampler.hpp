@@ -39,7 +39,7 @@ class Sampler {
 
 using SamplerPtr = std::unique_ptr<Sampler>;
 
-inline SamplerPtr descriptor_ptr(const SamplerParams& params) {
+inline SamplerPtr sampler_ptr(const SamplerParams& params) {
     return std::make_unique<Sampler>(params);
 }
 
