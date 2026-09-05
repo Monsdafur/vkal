@@ -5,61 +5,73 @@
 namespace vkal {
 
 TEST(RenderGraphTest, GraphGenerationTest) {
-    RenderGraph render_graph(RenderGraphParams{});
-
+    std::vector<RenderPassParams> pass_params;
     /*
      * a --> d --> c
      * a --> b --> c
      */
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass a",
-        .read_resources = {},
-        .write_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "A-B&D"},
+                ResourceDescription{
+                    .identifier = "A-B&D",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                },
             },
     });
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass b",
-        .read_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "A-B&D"},
-            },
-        .write_resources =
-            {
-                ResourceDescription{.identifier = "B-C"},
+                ResourceDescription{
+                    .identifier = "A-B&D",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
+                ResourceDescription{
+                    .identifier = "B-C",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                },
             },
     });
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass c",
-        .read_resources = {ResourceDescription{.identifier = "B-C"},
-                           ResourceDescription{.identifier = "D-C"}},
-        .write_resources = {},
+        .resources = {ResourceDescription{
+                          .identifier = "B-C",
+                          .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                      },
+                      ResourceDescription{
+                          .identifier = "D-C",
+                          .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                      }},
     });
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass d",
-        .read_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "A-B&D"},
-            },
-        .write_resources =
-            {
-                ResourceDescription{.identifier = "D-C"},
+                ResourceDescription{
+                    .identifier = "A-B&D",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
+                ResourceDescription{
+                    .identifier = "D-C",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                },
             },
     });
 
-    std::vector<RenderGraph::Node> nodes = render_graph.generate_graph();
+    std::vector<GraphNode> nodes = generate_graph(pass_params);
 
     ASSERT_EQ(nodes.size(), 4);
 
-    RenderGraph::Node& pass_a = nodes[0];
-    RenderGraph::Node& pass_b = nodes[1];
-    RenderGraph::Node& pass_c = nodes[2];
-    RenderGraph::Node& pass_d = nodes[3];
+    GraphNode& pass_a = nodes[0];
+    GraphNode& pass_b = nodes[1];
+    GraphNode& pass_c = nodes[2];
+    GraphNode& pass_d = nodes[3];
 
     ASSERT_EQ(pass_a.ins.size(), 0);
     ASSERT_EQ(pass_a.outs.size(), 2);
@@ -82,68 +94,83 @@ TEST(RenderGraphTest, GraphGenerationTest) {
 }
 
 TEST(RenderGraphTest, PruningTest) {
-    RenderGraph render_graph(RenderGraphParams{});
+    std::vector<RenderPassParams> pass_params;
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass a",
-        .read_resources = {},
-        .write_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "A-B&C"},
+                ResourceDescription{
+                    .identifier = "A-B&C",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                },
             },
     });
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass b",
-        .read_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "A-B&C"},
-            },
-        .write_resources =
-            {
-                ResourceDescription{.identifier = "B-r"},
+                ResourceDescription{
+                    .identifier = "A-B&C",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
+                ResourceDescription{
+                    .identifier = "B-r",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                },
             },
     });
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass c",
-        .read_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "A-B&C"},
-            },
-        .write_resources =
-            {
-                ResourceDescription{.identifier = "C-D&r"},
+                ResourceDescription{
+                    .identifier = "A-B&C",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
+                ResourceDescription{
+                    .identifier = "C-D&r",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                },
             },
     });
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass d",
-        .read_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "C-D&r"},
+                ResourceDescription{
+                    .identifier = "C-D&r",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
             },
-        .write_resources = {},
     });
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "root pass",
         .is_root = true,
-        .read_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "B-r"},
-                ResourceDescription{.identifier = "C-D&r"},
+                ResourceDescription{
+                    .identifier = "B-r",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
+                ResourceDescription{
+                    .identifier = "C-D&r",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
             },
-        .write_resources = {},
     });
 
-    std::vector<RenderGraph::Node> nodes = render_graph.generate_graph();
-    std::vector<std::pair<RenderGraph::Node, size_t>> post_pruned = render_graph.prune(nodes);
+    std::vector<GraphNode> nodes = generate_graph(pass_params);
+    std::vector<std::pair<GraphNode, size_t>> post_pruned = prune(pass_params, nodes);
 
-    auto extract_entry =
-        [&post_pruned, &render_graph](const std::string& key) -> std::optional<RenderGraph::Node> {
+    auto extract_entry = [&post_pruned,
+                          &pass_params](const std::string& key) -> std::optional<GraphNode> {
         for (const auto& entry : post_pruned) {
-            if (render_graph.pass_params[entry.first.pass_index].identifier == key) {
+            if (pass_params[entry.first.pass_index].identifier == key) {
                 return entry.first;
             }
         }
@@ -164,10 +191,10 @@ TEST(RenderGraphTest, PruningTest) {
     ASSERT_FALSE(pass_d_opt.has_value());
     ASSERT_TRUE(root_pass_opt.has_value());
 
-    RenderGraph::Node pass_a = pass_a_opt.value();
-    RenderGraph::Node pass_b = pass_b_opt.value();
-    RenderGraph::Node pass_c = pass_c_opt.value();
-    RenderGraph::Node root_pass = root_pass_opt.value();
+    GraphNode pass_a = pass_a_opt.value();
+    GraphNode pass_b = pass_b_opt.value();
+    GraphNode pass_c = pass_c_opt.value();
+    GraphNode root_pass = root_pass_opt.value();
 
     auto containing = [](size_t index, const std::vector<size_t>& indices) -> bool {
         for (size_t current_index : indices) {
@@ -196,71 +223,86 @@ TEST(RenderGraphTest, PruningTest) {
 }
 
 TEST(RenderGraphTest, ToplogySortTest) {
-    RenderGraph render_graph(RenderGraphParams{});
+    std::vector<RenderPassParams> pass_params;
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "root pass",
         .is_root = true,
-        .read_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "B-r"},
-                ResourceDescription{.identifier = "C-D&r"},
+                ResourceDescription{
+                    .identifier = "B-r",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
+                ResourceDescription{
+                    .identifier = "C-D&r",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
             },
-        .write_resources = {},
     });
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass a",
-        .read_resources = {},
-        .write_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "A-B&C"},
+                ResourceDescription{
+                    .identifier = "A-B&C",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                },
             },
     });
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass d",
-        .read_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "C-D&r"},
+                ResourceDescription{
+                    .identifier = "C-D&r",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
             },
-        .write_resources = {},
     });
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass b",
-        .read_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "A-B&C"},
-            },
-        .write_resources =
-            {
-                ResourceDescription{.identifier = "B-r"},
+                ResourceDescription{
+                    .identifier = "A-B&C",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
+                ResourceDescription{
+                    .identifier = "B-r",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                },
             },
     });
 
-    render_graph.add_pass(RenderPassParams{
+    pass_params.push_back(RenderPassParams{
         .identifier = "pass c",
-        .read_resources =
+        .resources =
             {
-                ResourceDescription{.identifier = "A-B&C"},
-            },
-        .write_resources =
-            {
-                ResourceDescription{.identifier = "C-D&r"},
+                ResourceDescription{
+                    .identifier = "A-B&C",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
+                ResourceDescription{
+                    .identifier = "C-D&r",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                },
             },
     });
 
-    std::vector<RenderGraph::Node> nodes = render_graph.generate_graph();
-    std::vector<std::pair<RenderGraph::Node, size_t>> post_pruned = render_graph.prune(nodes);
-    render_graph.topology_sort(post_pruned);
+    std::vector<GraphNode> nodes = generate_graph(pass_params);
+    std::vector<std::pair<GraphNode, size_t>> post_pruned = prune(pass_params, nodes);
+    std::vector<size_t> pass_order = topology_sort(post_pruned);
 
     ASSERT_TRUE(post_pruned.empty());
 
-    ASSERT_EQ(render_graph.pass_order[0].identifier, "pass a");
-    ASSERT_EQ(render_graph.pass_order[1].identifier, "pass c");
-    ASSERT_EQ(render_graph.pass_order[2].identifier, "pass b");
-    ASSERT_EQ(render_graph.pass_order[3].identifier, "root pass");
+    ASSERT_EQ(pass_params[pass_order[0]].identifier, "pass a");
+    ASSERT_EQ(pass_params[pass_order[1]].identifier, "pass c");
+    ASSERT_EQ(pass_params[pass_order[2]].identifier, "pass b");
+    ASSERT_EQ(pass_params[pass_order[3]].identifier, "root pass");
 }
 
 } // namespace vkal
