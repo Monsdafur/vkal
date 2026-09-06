@@ -238,6 +238,7 @@ void RenderGraph::generate_passes() {
             if (barrier.has_value()) {
                 pass->buffer_barrier_builders.push_back(BufferBarrierBuilder{
                     .identifier = identifier,
+                    .preserve = barrier->preserve,
                     .buffer = buffer,
                     .access = barrier->access,
                     .stage = barrier->stage,
@@ -269,6 +270,7 @@ void RenderGraph::generate_passes() {
             // Setup image barrier
             pass->image_barrier_builders.push_back(ImageBarrierBuilder{
                 .identifier = identifier,
+                .preserve = barrier.preserve,
                 .image = image,
                 .access = barrier.access,
                 .stage = barrier.stage,
@@ -370,11 +372,12 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
         for (const BufferBarrierBuilder& buffer_barrier_builder : pass->buffer_barrier_builders) {
             Buffer& buffer = buffer_barrier_builder.buffer;
             vk::BufferMemoryBarrier2 buffer_barrier;
+            bool preserve = buffer_barrier_builder.preserve;
             buffer_barrier.setBuffer(buffer.get())
                 .setOffset(0)
                 .setSize(buffer.get_size())
-                .setSrcAccessMask(buffer.get_access())
-                .setSrcStageMask(buffer.get_stage())
+                .setSrcAccessMask(preserve ? buffer.get_access() : vk::AccessFlagBits2::eNone)
+                .setSrcStageMask(preserve ? buffer.get_stage() : vk::PipelineStageFlagBits2::eNone)
                 .setDstAccessMask(buffer_barrier_builder.access)
                 .setDstStageMask(buffer_barrier_builder.stage);
             pass->buffer_barriers.push_back(buffer_barrier);
@@ -384,10 +387,11 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
         for (const ImageBarrierBuilder& image_barrier_builder : pass->image_barrier_builders) {
             Image& image = image_barrier_builder.image;
             vk::ImageMemoryBarrier2 image_barrier;
+            bool preserve = image_barrier_builder.preserve;
             image_barrier.setImage(image.get())
-                .setSrcAccessMask(image.get_access(0))
-                .setSrcStageMask(image.get_stage(0))
-                .setOldLayout(image.get_layout(0))
+                .setSrcAccessMask(preserve ? image.get_access(0) : vk::AccessFlagBits2::eNone)
+                .setSrcStageMask(preserve ? image.get_stage(0) : vk::PipelineStageFlagBits2::eNone)
+                .setOldLayout(preserve ? image.get_layout(0) : vk::ImageLayout::eUndefined)
                 .setDstAccessMask(image_barrier_builder.access)
                 .setDstStageMask(image_barrier_builder.stage)
                 .setNewLayout(image_barrier_builder.layout)

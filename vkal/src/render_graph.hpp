@@ -14,6 +14,7 @@
 namespace vkal {
 
 struct ResourceBarrier {
+    bool preserve = true;
     vk::ImageLayout layout;
     vk::AccessFlags2 access;
     vk::PipelineStageFlags2 stage;
@@ -88,6 +89,7 @@ struct GraphNode {
 struct BufferBarrierBuilder {
     // Identifier for later rebind operation
     std::string identifier;
+    bool preserve;
     std::reference_wrapper<Buffer> buffer;
     vk::AccessFlags2 access;
     vk::PipelineStageFlags2 stage;
@@ -96,6 +98,7 @@ struct BufferBarrierBuilder {
 struct ImageBarrierBuilder {
     // Identifier for later rebind operation
     std::string identifier;
+    bool preserve;
     std::reference_wrapper<Image> image;
     vk::AccessFlags2 access;
     vk::PipelineStageFlags2 stage;
