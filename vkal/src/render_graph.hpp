@@ -156,11 +156,6 @@ class RenderGraph {
     std::vector<size_t> pass_order;
     std::vector<std::unique_ptr<RenderPassData>> pass_data;
 
-    vk::CommandBufferSubmitInfo command_submit_info;
-    vk::SemaphoreSubmitInfo wait_semaphore_info;
-    vk::SemaphoreSubmitInfo signal_semaphore_info;
-
-    vk::SubmitInfo2 submit_info;
     vk::Semaphore semaphore;
     vk::Fence fence;
 

@@ -185,14 +185,6 @@ RenderGraph::RenderGraph(const RenderGraphParams& params)
     this->semaphore = this->vkal_device.get().createSemaphore(vk::SemaphoreCreateInfo());
     this->fence = this->vkal_device.get().createFence(
         vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
-    this->command_submit_info.setDeviceMask(1);
-    this->wait_semaphore_info.setSemaphore(this->semaphore)
-        .setStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput);
-    this->signal_semaphore_info.setStageMask(vk::PipelineStageFlagBits2::eAllCommands);
-
-    this->submit_info.setCommandBufferInfos(command_submit_info)
-        .setWaitSemaphoreInfos(wait_semaphore_info)
-        .setSignalSemaphoreInfos(signal_semaphore_info);
 
     this->reset_swapchain_images();
 }
@@ -393,7 +385,6 @@ void RenderGraph::sync() {
 void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::CommandBuffer command,
                           vk::Semaphore semaphore) {
     this->vkal_device.get().resetFences(this->fence);
-    this->signal_semaphore_info.setSemaphore(semaphore);
     command.reset();
     command.begin(vk::CommandBufferBeginInfo());
 
@@ -473,8 +464,35 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
     }
 
     command.end();
-    this->command_submit_info.setCommandBuffer(command);
-    queue.submit2(this->submit_info, this->fence);
+
+    vk::CommandBufferSubmitInfo command_submit_info;
+    command_submit_info.setCommandBuffer(command).setDeviceMask(1);
+
+    vk::SemaphoreSubmitInfo signal_semaphore_info;
+    signal_semaphore_info.setSemaphore(semaphore).setStageMask(
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput);
+
+    vk::SemaphoreSubmitInfo wait_semaphore_info;
+    wait_semaphore_info.setSemaphore(this->semaphore)
+        .setStageMask(vk::PipelineStageFlagBits2::eAllCommands);
+
+    vk::SubmitInfo2 submit_info;
+    submit_info.setCommandBufferInfos(command_submit_info)
+        .setSignalSemaphoreInfos(signal_semaphore_info)
+        .setWaitSemaphoreInfos(wait_semaphore_info);
+    queue.submit2(submit_info, this->fence);
+}
+
+///////////////////////////////////////////////////////////
+void RenderGraph::rebound_resources() {
+    for (std::unique_ptr<RenderPassData>& render_pass_data : this->pass_data) {
+        for (auto& entry : render_pass_data->image_resources) {
+            entry.second = this->render_resources.get_image(entry.first);
+        }
+        for (auto& entry : render_pass_data->buffer_resources) {
+            entry.second = this->render_resources.get_buffer(entry.first);
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////

@@ -106,12 +106,15 @@ std::optional<uint32_t> Surface::acquire_next_frame(vk::Semaphore semaphore) {
         return std::nullopt;
     }
 
-    this->acquire_info.setSemaphore(semaphore);
-
+    vk::AcquireNextImageInfoKHR acquire_info;
+    acquire_info.setSwapchain(this->swapchain)
+        .setSemaphore(semaphore)
+        .setTimeout(UINT64_MAX)
+        .setDeviceMask(1);
     vk::Result acquire_result;
     try {
         vk::ResultValue<uint32_t> acquire_result_value =
-            this->vkal_device.get().acquireNextImage2KHR(this->acquire_info);
+            this->vkal_device.get().acquireNextImage2KHR(acquire_info);
         this->image_index = acquire_result_value.value;
         acquire_result = acquire_result_value.result;
     } catch (const vk::OutOfDateKHRError& e) {
@@ -143,12 +146,14 @@ std::optional<uint32_t> Surface::acquire_next_frame(vk::Semaphore semaphore) {
 
 ///////////////////////////////////////////////////////////
 void Surface::present() {
-    this->present_info.setWaitSemaphores(this->semaphores[this->image_index]);
-    this->present_info.setImageIndices(this->image_index);
+    vk::PresentInfoKHR present_info;
+    present_info.setSwapchains(this->swapchain)
+        .setWaitSemaphores(this->semaphores[this->image_index])
+        .setImageIndices(this->image_index);
 
     vk::Result present_result;
     try {
-        present_result = this->present_queue.presentKHR(this->present_info);
+        present_result = this->present_queue.presentKHR(present_info);
     } catch (const vk::OutOfDateKHRError& e) {
         present_result = vk::Result::eErrorOutOfDateKHR;
     }
@@ -255,10 +260,6 @@ void Surface::create_swapchain() {
         });
         this->images.push_back(std::move(vkal_image));
     }
-
-    // Setup acquire and present info
-    this->acquire_info.setSwapchain(this->swapchain).setTimeout(UINT64_MAX).setDeviceMask(1);
-    this->present_info.setSwapchains(this->swapchain);
 
     this->resize_callback(this->capabilities.currentExtent);
 

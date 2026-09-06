@@ -68,9 +68,6 @@ class Surface {
     vk::SwapchainKHR swapchain = nullptr;
     std::vector<ImagePtr> images;
     std::vector<vk::Semaphore> semaphores;
-
-    vk::AcquireNextImageInfoKHR acquire_info;
-    vk::PresentInfoKHR present_info;
 };
 
 using SurfacePtr = std::unique_ptr<Surface>;

@@ -21,6 +21,10 @@ class RenderPass {
     }
     virtual void render(vk::CommandBuffer) {
     }
+    virtual void
+    on_rebound_resources(const std::unordered_map<std::string, std::reference_wrapper<Buffer>>&,
+                         const std::unordered_map<std::string, std::reference_wrapper<Image>>&) {
+    }
 };
 
 }; // namespace vkal

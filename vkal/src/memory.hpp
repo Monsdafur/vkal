@@ -62,11 +62,11 @@ class MemoryBlock {
     carve(MemoryChunk& chunk, vk::DeviceSize size, vk::DeviceSize alignment);
 
     Device& vkal_device;
+    vk::DeviceSize size;
     vk::MemoryPropertyFlags properties;
     uint32_t memory_type;
     vk::DeviceMemory memory;
     void* data;
-    vk::MappedMemoryRange memory_range;
 
     size_t chunk_count = 1;
     std::unique_ptr<MemoryChunk> first_chunk;

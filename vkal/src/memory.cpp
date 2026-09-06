@@ -21,12 +21,12 @@ static uint32_t find_memory_type(vk::PhysicalDevice physical_device, uint32_t fi
 
 ///////////////////////////////////////////////////////////
 MemoryBlock::MemoryBlock(const MemoryBlockParams& params)
-    : vkal_device(params.vkal_device), properties(params.properties),
+    : vkal_device(params.vkal_device), size(params.block_size), properties(params.properties),
       memory_type(find_memory_type(this->vkal_device.get_physical(),
                                    params.memory_requirements.memoryTypeBits, this->properties)) {
 
     vk::MemoryAllocateInfo memory_allocate_info;
-    memory_allocate_info.setAllocationSize(params.block_size).setMemoryTypeIndex(this->memory_type);
+    memory_allocate_info.setAllocationSize(this->size).setMemoryTypeIndex(this->memory_type);
     this->memory = this->vkal_device.get().allocateMemory(memory_allocate_info);
 
     // Only map data when the host visible bits are active
@@ -34,20 +34,17 @@ MemoryBlock::MemoryBlock(const MemoryBlockParams& params)
         vk::MemoryPropertyFlagBits::eHostVisible) {
 #if defined(VULKAN_VERSION_1_4)
         this->data = this->vkal_device.get().mapMemory2(
-            vk::MemoryMapInfo(vk::MemoryMapFlags(), this->memory, 0, params.block_size));
+            vk::MemoryMapInfo(vk::MemoryMapFlags(), this->memory, 0, this->size));
 #else
-        this->data = this->vkal_device.get().mapMemory(this->memory, 0, params.block_size);
+        this->data = this->vkal_device.get().mapMemory(this->memory, 0, this->size);
 #endif
     }
 
     // Add initial memory chunk that covers everything
     this->first_chunk = std::make_unique<MemoryChunk>(MemoryChunk{
         .offset = 0,
-        .size = params.block_size,
+        .size = this->size,
     });
-
-    // Setup flush info
-    this->memory_range.setMemory(this->memory).setOffset(0).setSize(params.block_size);
 }
 
 ///////////////////////////////////////////////////////////
@@ -92,7 +89,8 @@ void MemoryBlock::flush() {
     bool is_coherent = (this->properties & vk::MemoryPropertyFlagBits::eHostCoherent) ==
                        vk::MemoryPropertyFlagBits::eHostCoherent;
     if (is_visible && !is_coherent) {
-        this->vkal_device.get().flushMappedMemoryRanges(this->memory_range);
+        this->vkal_device.get().flushMappedMemoryRanges(
+            vk::MappedMemoryRange(this->memory, 0, this->size));
     }
 }
 
