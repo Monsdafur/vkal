@@ -107,10 +107,22 @@ gtest_discover_tests(surface_test)
 gtest_discover_tests(render_graph_test)
 gtest_discover_tests(descriptor_test)
 
+# Create helper library
+file (GLOB VKAL_HELPER_SRC 
+    "samples/vkal-helper/*.cpp" 
+)
+add_library(vkal-helper STATIC ${VKAL_HELPER_SRC})
+include_directories(vkal-helper PUBLIC ${CMAKE_SOURCE_DIR}/samplers/vkal-helper)
+target_link_libraries(vkal-helper PUBLIC vkal glm)
+
 # Add executables
 add_executable(triangle samples/triangle.cpp)
-target_link_libraries(triangle PUBLIC vkal glm)
+target_link_libraries(triangle PUBLIC vkal-helper)
 target_compile_definitions(triangle PRIVATE _USE_MATH_DEFINES)
+
+add_executable(texture samples/texture.cpp)
+target_link_libraries(texture PUBLIC vkal-helper)
+target_compile_definitions(texture PRIVATE _USE_MATH_DEFINES)
 
 # Apply clang-format
 file (GLOB_RECURSE SOURCES
@@ -131,7 +143,9 @@ if(CLANG_TIDY_EXE)
     set(TIDY_CMD
         "${CLANG_TIDY_EXE}"
         "--config-file=${CMAKE_SOURCE_DIR}/.clang-tidy"
-        "--header-filter=^${CMAKE_SOURCE_DIR}/(triangle|vkal)"
+        "--header-filter=^${CMAKE_SOURCE_DIR}/(triangle|texture|vkal)"
     )
     set_target_properties(vkal PROPERTIES CXX_CLANG_TIDY "${TIDY_CMD}")
+    set_target_properties(triangle PROPERTIES CXX_CLANG_TIDY "${TIDY_CMD}")
+    set_target_properties(texture PROPERTIES CXX_CLANG_TIDY "${TIDY_CMD}")
 endif()

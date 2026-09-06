@@ -13,6 +13,11 @@ Image::Image(const ImageParams& params)
       view(this->create_view()) {
     this->allocator_info->block.map_data(this->allocator_info->chunk, &this->data);
     this->is_swapchain_owned = false;
+
+    this->accesses = std::vector<vk::AccessFlags2>(this->mip_levels, vk::AccessFlagBits2::eNone);
+    this->stages =
+        std::vector<vk::PipelineStageFlags2>(this->mip_levels, vk::PipelineStageFlagBits2::eNone);
+    this->layouts = std::vector<vk::ImageLayout>(this->mip_levels, vk::ImageLayout::eUndefined);
 }
 
 ///////////////////////////////////////////////////////////
@@ -42,8 +47,9 @@ Image::~Image() {
 void Image::set_barrier(vk::ImageLayout layout, vk::AccessFlags2 access,
                         vk::PipelineStageFlags2 stage, uint32_t target_mip, uint32_t mip_count) {
     for (size_t i = target_mip; i < target_mip + mip_count; ++i) {
-        this->access[i] = access;
-        this->stage[i] = stage;
+        this->accesses[i] = access;
+        this->stages[i] = stage;
+        this->layouts[i] = layout;
     }
 }
 
@@ -55,6 +61,11 @@ const vk::MemoryRequirements Image::get_memory_requirements() const {
 ///////////////////////////////////////////////////////////
 vk::Image Image::get() {
     return this->image;
+}
+
+///////////////////////////////////////////////////////////
+uint32_t Image::get_mip_count() const {
+    return this->mip_levels;
 }
 
 vk::Extent3D Image::get_extent() const {
@@ -143,12 +154,17 @@ vk::ImageView Image::create_view() {
 
 ///////////////////////////////////////////////////////////
 vk::AccessFlags2 Image::get_access(size_t index) {
-    return this->access[index];
+    return this->accesses[index];
 }
 
 ///////////////////////////////////////////////////////////
 vk::PipelineStageFlags2 Image::get_stage(size_t index) {
-    return this->stage[index];
+    return this->stages[index];
+}
+
+///////////////////////////////////////////////////////////
+vk::ImageLayout Image::get_layout(size_t index) {
+    return this->layouts[index];
 }
 
 } // namespace vkal

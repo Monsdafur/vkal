@@ -100,11 +100,12 @@ TEST(RenderGraphTest, PruningTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "pass a",
-        .buffer_resources =
+        .image_resources =
             {
-                BufferResourceDescription{
+                ImageResourceDescription{
                     .identifier = "A-B&C",
-                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                    .barrier =
+                        ResourceBarrier{.access = vk::AccessFlagBits2::eColorAttachmentWrite},
                 },
             },
     });
@@ -114,12 +115,15 @@ TEST(RenderGraphTest, PruningTest) {
         .buffer_resources =
             {
                 BufferResourceDescription{
-                    .identifier = "A-B&C",
-                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
-                },
-                BufferResourceDescription{
                     .identifier = "B-r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                },
+            },
+        .image_resources =
+            {
+                ImageResourceDescription{
+                    .identifier = "A-B&C",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderSampledRead},
                 },
             },
     });
@@ -129,12 +133,15 @@ TEST(RenderGraphTest, PruningTest) {
         .buffer_resources =
             {
                 BufferResourceDescription{
-                    .identifier = "A-B&C",
-                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
-                },
-                BufferResourceDescription{
                     .identifier = "C-D&r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderWrite},
+                },
+            },
+        .image_resources =
+            {
+                ImageResourceDescription{
+                    .identifier = "A-B&C",
+                    .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderSampledRead},
                 },
             },
     });

@@ -49,6 +49,8 @@ class Image {
 
     vk::Image get();
 
+    uint32_t get_mip_count() const;
+
     vk::Extent3D get_extent() const;
 
     vk::ImageView get_view() const;
@@ -62,6 +64,8 @@ class Image {
     vk::AccessFlags2 get_access(size_t index);
 
     vk::PipelineStageFlags2 get_stage(size_t index);
+
+    vk::ImageLayout get_layout(size_t index);
 
   private:
     vk::Image create_image(const ImageParams& params);
@@ -85,8 +89,9 @@ class Image {
     std::optional<MemoryAllocatorInfo> allocator_info;
     vk::ImageView view;
     void* data;
-    std::vector<vk::AccessFlags2> access;
-    std::vector<vk::PipelineStageFlags2> stage;
+    std::vector<vk::AccessFlags2> accesses;
+    std::vector<vk::PipelineStageFlags2> stages;
+    std::vector<vk::ImageLayout> layouts;
 
     // Test
     FRIEND_TEST(MemoryAllocatorTest, AddImage);

@@ -9,6 +9,8 @@
 #include "../vkal/src/render_resources.hpp"
 #include "../vkal/src/surface.hpp"
 
+#include "vkal-helper/utilities.hpp"
+
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -213,20 +215,16 @@ int main() {
         Uniform uniform = {.rotation = glm::mat4(1.0f)};
 
         // Create vertex buffer
-        vkal::Buffer& vertex_buffer = render_resources.create_buffer(vkal::BufferResourceParams{
-            .identifier = "vertex buffer",
-            .size = sizeof(Vertex) * vertices.size(),
-            .usage = vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-            .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
-        });
+        vkal::Buffer& vertex_buffer = add_device_local_buffer(
+            queue, command, *vkal_device, render_resources, "vertex buffer",
+            sizeof(Vertex) * vertices.size(), vk::BufferUsageFlagBits::eVertexBuffer,
+            vk::MemoryPropertyFlags(), vertices.data());
 
         // Create index buffer
-        vkal::Buffer& index_buffer = render_resources.create_buffer(vkal::BufferResourceParams{
-            .identifier = "index buffer",
-            .size = sizeof(uint32_t) * indices.size(),
-            .usage = vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-            .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
-        });
+        vkal::Buffer& index_buffer = add_device_local_buffer(
+            queue, command, *vkal_device, render_resources, "index buffer",
+            sizeof(uint32_t) * indices.size(), vk::BufferUsageFlagBits::eIndexBuffer,
+            vk::MemoryPropertyFlags(), indices.data());
 
         // Craete uniform buffer
         vkal::Buffer& uniform_buffer = render_resources.create_buffer(vkal::BufferResourceParams{
@@ -236,49 +234,6 @@ int main() {
             .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible |
                                  vk::MemoryPropertyFlagBits::eHostCoherent,
         });
-
-        {
-            vkal::BufferPtr staging0 = vkal::buffer_ptr(vkal::BufferParams{
-                .vkal_device = *vkal_device,
-                .memory_allocator = *memory_allocator,
-                .size = sizeof(Vertex) * vertices.size(),
-                .usage = vk::BufferUsageFlagBits::eTransferSrc,
-                .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible |
-                                     vk::MemoryPropertyFlagBits::eHostCoherent,
-            });
-            vkal::BufferPtr staging1 = vkal::buffer_ptr(vkal::BufferParams{
-                .vkal_device = *vkal_device,
-                .memory_allocator = *memory_allocator,
-                .size = sizeof(uint32_t) * indices.size(),
-                .usage = vk::BufferUsageFlagBits::eTransferSrc,
-                .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible |
-                                     vk::MemoryPropertyFlagBits::eHostCoherent,
-            });
-            staging0->upload(vertices.data(), sizeof(Vertex) * vertices.size());
-            staging1->upload(indices.data(), sizeof(uint32_t) * indices.size());
-
-            command.begin(vk::CommandBufferBeginInfo());
-            vk::BufferCopy2 region;
-            region.setSrcOffset(0).setDstOffset(0).setSize(vertex_buffer.get_size());
-            vk::CopyBufferInfo2 copy_buffer_info;
-            copy_buffer_info.setSrcBuffer(staging0->get())
-                .setDstBuffer(vertex_buffer.get())
-                .setRegions(region);
-
-            command.copyBuffer2(copy_buffer_info);
-            region.setSize(index_buffer.get_size());
-            copy_buffer_info.setSrcBuffer(staging1->get()).setDstBuffer(index_buffer.get());
-            command.copyBuffer2(copy_buffer_info);
-
-            command.end();
-
-            vk::CommandBufferSubmitInfo command_submit_info;
-            command_submit_info.setCommandBuffer(command).setDeviceMask(1);
-            vk::SubmitInfo2 submit_info;
-            submit_info.setCommandBufferInfos(command_submit_info);
-            queue.submit2(submit_info);
-            queue.waitIdle();
-        }
 
         // Render graph
         vkal::RenderGraphPtr render_graph = vkal::render_graph_ptr(vkal::RenderGraphParams{
@@ -303,7 +258,7 @@ int main() {
                         .access = vk::AccessFlagBits2::eShaderRead,
                         .stage = vk::PipelineStageFlagBits2::eVertexShader,
                     },
-                .resource_rescriptor =
+                .resource_descriptor =
                     vkal::ResourceDescriptor{
                         .type = vk::DescriptorType::eUniformBuffer,
                         .set = 0,

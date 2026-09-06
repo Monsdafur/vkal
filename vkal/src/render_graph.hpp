@@ -26,9 +26,9 @@ struct RenderAttachmentParams {
     };
 
     std::string identifier;
-    std::string resolve_image;
     std::string image;
-    vk::ResolveModeFlags resolve_mode;
+    std::optional<std::string> resolve_image;
+    vk::ResolveModeFlagBits resolve_mode;
     vk::ClearValue clear_value;
     vk::AttachmentLoadOp load_op;
     vk::AttachmentStoreOp store_op;
@@ -43,16 +43,16 @@ struct ResourceDescriptor {
 struct BufferResourceDescription {
     std::string identifier;
     std::optional<ResourceBarrier> barrier;
-    std::optional<ResourceDescriptor> resource_rescriptor;
+    std::optional<ResourceDescriptor> resource_descriptor = std::nullopt;
 };
 
 struct ImageResourceDescription {
     std::string identifier;
     ResourceBarrier barrier; // A barrier is a must for an image resource
-    std::optional<ResourceDescriptor> resource_rescriptor;
+    std::optional<ResourceDescriptor> resource_descriptor = std::nullopt;
 };
 
-struct SamplerResource {
+struct SamplerResourceDescription {
     std::string identifier;
     uint32_t set;
     uint32_t binding;
@@ -65,7 +65,7 @@ struct RenderPassParams {
     std::vector<BufferResourceDescription> buffer_resources;
     std::vector<ImageResourceDescription> image_resources;
     std::vector<RenderAttachmentParams> render_attachments;
-    std::vector<SamplerResource> samplers_resources;
+    std::vector<SamplerResourceDescription> sampler_resources;
 
     std::optional<std::string> pipeline;
 
@@ -86,6 +86,8 @@ struct GraphNode {
 };
 
 struct RenderPassData {
+    bool is_root;
+
     std::optional<std::reference_wrapper<Pipeline>> pipeline;
     DescriptorSetPtr descriptor_set;
 
@@ -103,6 +105,7 @@ struct RenderPassData {
     std::vector<vk::BufferMemoryBarrier2> buffer_barriers;
     std::vector<std::reference_wrapper<Buffer>> buffer_barriers_refs;
     std::vector<vk::ImageMemoryBarrier2> image_barriers;
+    std::vector<std::pair<size_t, size_t>> image_barrier_bundles;
     std::vector<std::reference_wrapper<Image>> image_barriers_refs;
     vk::ImageMemoryBarrier2 swapchain_barrier;
 
@@ -132,6 +135,8 @@ class RenderGraph {
 
     void execute(uint32_t swapchain_index, vk::Queue queue, vk::CommandBuffer command,
                  vk::Semaphore semaphore);
+
+    void rebound_resources();
 
     vk::Semaphore get_semaphore();
 

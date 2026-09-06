@@ -125,6 +125,11 @@ Sampler& RenderResources::create_sampler(const SamplerResourceParams& sampler_pa
 }
 
 ///////////////////////////////////////////////////////////
+MemoryAllocator& RenderResources::get_memory_allocator() {
+    return this->memory_allocator;
+}
+
+///////////////////////////////////////////////////////////
 Buffer& RenderResources::get_buffer(const std::string& identifier) {
     return *this->buffers.at(identifier);
 }

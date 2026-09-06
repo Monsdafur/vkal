@@ -105,6 +105,8 @@ class RenderResources {
 
     Sampler& create_sampler(const SamplerResourceParams& sampler_params);
 
+    MemoryAllocator& get_memory_allocator();
+
     Buffer& get_buffer(const std::string& identifier);
 
     Image& get_image(const std::string& identifier);
