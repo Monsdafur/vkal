@@ -279,7 +279,7 @@ int main() {
                     },
                 },
             .color_attachment_formats = {vk::Format::eR8G8B8A8Srgb},
-            .rasterization_sample_count = vk::SampleCountFlagBits::e1,
+            .rasterization_sample_count = vk::SampleCountFlagBits::e4,
             .vertex_input_rate = vk::VertexInputRate::eVertex,
             .vertex_stride = sizeof(Vertex),
             .vertex_descriptions =
@@ -395,7 +395,7 @@ int main() {
                                  vk::MemoryPropertyFlagBits::eHostCoherent,
         });
 
-        // Create color attachment
+        // Create color attachments
         render_resources.create_image(vkal::ImageResourceParams{
             .identifier = "color attachment",
             .type = vk::ImageType::e2D,
@@ -406,6 +406,20 @@ int main() {
             .aspects = vk::ImageAspectFlagBits::eColor,
             .mip_levels = 1,
             .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+            .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+        });
+
+        render_resources.create_image(vkal::ImageResourceParams{
+            .identifier = "msaa",
+            .type = vk::ImageType::e2D,
+            .view_type = vk::ImageViewType::e2D,
+            .extent = vk::Extent3D(WINDOW_EXTENT, 1),
+            .format = vk::Format::eR8G8B8A8Srgb,
+            .sample_count = vk::SampleCountFlagBits::e4,
+            .aspects = vk::ImageAspectFlagBits::eColor,
+            .mip_levels = 1,
+            .usage = vk::ImageUsageFlagBits::eColorAttachment |
+                     vk::ImageUsageFlagBits::eTransientAttachment,
             .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         });
 
@@ -467,6 +481,16 @@ int main() {
                         .stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                     },
             });
+            image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
+                .identifier = "msaa",
+                .barrier =
+                    vkal::ResourceBarrier{
+                        .preserve = false,
+                        .layout = vk::ImageLayout::eColorAttachmentOptimal,
+                        .access = vk::AccessFlagBits2::eColorAttachmentWrite,
+                        .stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                    },
+            });
 
             std::vector<vkal::SamplerResourceDescription> sampler_resouces_description;
             sampler_resouces_description.push_back(vkal::SamplerResourceDescription{
@@ -478,9 +502,11 @@ int main() {
             std::vector<vkal::RenderAttachmentParams> render_attachments = {
                 vkal::RenderAttachmentParams{
                     .identifier = "main attachment",
-                    .image = "color attachment",
+                    .image = "msaa",
+                    .resolve_image = "color attachment",
+                    .resolve_mode = vk::ResolveModeFlagBits::eAverage,
                     .clear_value = vk::ClearValue(
-                        vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f})),
+                        vk::ClearColorValue(std::array<float, 4>{0.01f, 0.01f, 0.01f, 1.0f})),
                     .load_op = vk::AttachmentLoadOp::eClear,
                     .store_op = vk::AttachmentStoreOp::eStore,
                 },
