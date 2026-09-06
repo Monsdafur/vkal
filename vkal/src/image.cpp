@@ -26,6 +26,11 @@ Image::Image(const SwapchainImageParams& params)
       extent(params.extent, 1), format(params.format), aspects(params.aspects), mip_levels(1),
       image(params.image), view(this->create_view()) {
     this->is_swapchain_owned = true;
+
+    this->accesses = std::vector<vk::AccessFlags2>(this->mip_levels, vk::AccessFlagBits2::eNone);
+    this->stages =
+        std::vector<vk::PipelineStageFlags2>(this->mip_levels, vk::PipelineStageFlagBits2::eNone);
+    this->layouts = std::vector<vk::ImageLayout>(this->mip_levels, vk::ImageLayout::eUndefined);
 }
 
 ///////////////////////////////////////////////////////////

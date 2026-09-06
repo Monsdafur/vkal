@@ -236,14 +236,12 @@ void RenderGraph::generate_passes() {
 
             // Setup barrier if there are any
             if (barrier.has_value()) {
-                vk::BufferMemoryBarrier2 buffer_barrier;
-                buffer_barrier.setBuffer(buffer.get())
-                    .setOffset(0)
-                    .setSize(buffer.get_size())
-                    .setDstAccessMask(barrier->access)
-                    .setDstStageMask(barrier->stage);
-                pass->buffer_barriers.push_back(buffer_barrier);
-                pass->buffer_barriers_refs.push_back(buffer);
+                pass->buffer_barrier_builders.push_back(BufferBarrierBuilder{
+                    .identifier = identifier,
+                    .buffer = buffer,
+                    .access = barrier->access,
+                    .stage = barrier->stage,
+                });
             }
 
             // Write to descriptor set if enabled
@@ -259,6 +257,7 @@ void RenderGraph::generate_passes() {
                 });
             }
         }
+        pass->buffer_barriers.reserve(pass->buffer_barrier_builders.size());
 
         for (const ImageResourceDescription& image_description : pass_params.image_resources) {
             const std::string& identifier = image_description.identifier;
@@ -268,18 +267,13 @@ void RenderGraph::generate_passes() {
             pass->image_resources.try_emplace(identifier, image);
 
             // Setup image barrier
-            pass->image_barrier_bundles.push_back(
-                {pass->image_barriers.size(), static_cast<size_t>(image.get_mip_count())});
-            for (uint32_t i = 0; i < image.get_mip_count(); ++i) {
-                vk::ImageMemoryBarrier2 image_barrier;
-                image_barrier.setImage(image.get())
-                    .setDstAccessMask(barrier.access)
-                    .setDstStageMask(barrier.stage)
-                    .setNewLayout(barrier.layout)
-                    .setSubresourceRange(vk::ImageSubresourceRange(image.get_aspect(), i, 1, 0, 1));
-                pass->image_barriers.push_back(std::move(image_barrier));
-            }
-            pass->image_barriers_refs.push_back(image);
+            pass->image_barrier_builders.push_back(ImageBarrierBuilder{
+                .identifier = identifier,
+                .image = image,
+                .access = barrier.access,
+                .stage = barrier.stage,
+                .layout = barrier.layout,
+            });
             layouts.emplace(identifier, barrier.layout);
 
             // Write to descriptor set if enabled
@@ -296,6 +290,7 @@ void RenderGraph::generate_passes() {
                 });
             }
         }
+        pass->image_barriers.reserve(pass->image_barrier_builders.size() + 1);
 
         // Collect all sampler resources
         for (const SamplerResourceDescription& sampler_resources : pass_params.sampler_resources) {
@@ -314,59 +309,37 @@ void RenderGraph::generate_passes() {
             pass->sampler_resources.try_emplace(identifier, sampler);
         }
 
-        // Create a dependency info if there are resource barriers
-        if (!pass->buffer_barriers.empty() || !pass->image_barriers.empty()) {
-            pass->dependency_info.emplace();
-            if (!pass->buffer_barriers.empty()) {
-                pass->dependency_info->setBufferMemoryBarriers(pass->buffer_barriers);
-            }
-            if (!pass->image_barriers.empty()) {
-                pass->dependency_info->setImageMemoryBarriers(pass->image_barriers);
-            }
-        }
-
-        // Setup render attachments if pass is not root
         pass->is_root = pass_params.is_root;
-        if (pass->is_root) {
-            pass->swapchain_attachment
-                .setClearValue(vk::ClearValue(
-                    vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f})))
-                .setLoadOp(vk::AttachmentLoadOp::eClear)
-                .setStoreOp(vk::AttachmentStoreOp::eStore)
-                .setImageLayout(vk::ImageLayout::eColorAttachmentOptimal);
-            pass->rendering_info.setLayerCount(1).setColorAttachments(pass->swapchain_attachment);
-
-            pass->swapchain_depedency_info.emplace();
-            pass->swapchain_depedency_info->setImageMemoryBarriers(pass->swapchain_barrier);
-        } else {
+        // if pass is root then attachments other than the swapchain are irrelevant
+        if (!pass->is_root) {
             for (const RenderAttachmentParams& attachment_params : pass_params.render_attachments) {
                 Image& image = pass->image_resources.at(attachment_params.image);
-                vk::RenderingAttachmentInfo render_attachment;
-                render_attachment.setClearValue(attachment_params.clear_value)
-                    .setLoadOp(attachment_params.load_op)
-                    .setStoreOp(attachment_params.store_op)
-                    .setImageView(image.get_view())
-                    .setImageLayout(layouts.at(attachment_params.image));
-
-                // Resolve image is optional
-                if (attachment_params.resolve_image.has_value()) {
-                    Image& resolve_image =
-                        pass->image_resources.at(*attachment_params.resolve_image);
-                    render_attachment.setResolveImageView(resolve_image.get_view())
-                        .setResolveImageLayout(layouts.at(*attachment_params.resolve_image))
-                        .setResolveMode(attachment_params.resolve_mode);
+                RenderAttachmentBuilder attachment_builder = {
+                    .image_identifier = attachment_params.image,
+                    .resolve_image_identifier = attachment_params.resolve_image,
+                    .image = image,
+                    .layout = layouts.at(attachment_params.image),
+                    .resolve_mode = attachment_params.resolve_mode,
+                    .clear_value = attachment_params.clear_value,
+                    .load_op = attachment_params.load_op,
+                    .store_op = attachment_params.store_op,
+                };
+                if (attachment_builder.resolve_image_identifier.has_value()) {
+                    attachment_builder.resolve_image =
+                        pass->image_resources.at(*attachment_builder.resolve_image_identifier);
+                    attachment_builder.resolve_layout =
+                        layouts.at(*attachment_builder.resolve_image_identifier);
                 }
-                pass->render_attachments.push_back(render_attachment);
-                pass->render_attachments_refs.emplace(attachment_params.identifier,
-                                                      pass->render_attachments.back());
-                pass->attachment_images.push_back(image);
+
+                pass->render_attachment_builders.push_back(std::move(attachment_builder));
             }
-            pass->rendering_info.setLayerCount(1).setColorAttachments(pass->render_attachments);
+            pass->render_attachment_infos.reserve(pass->render_attachment_builders.size());
+        } else {
+            pass->render_attachment_infos.reserve(1);
         }
 
         pass->pass = std::move(pass_params.pass);
-        pass->pass->setup_metadata(pass->buffer_resources, pass->image_resources,
-                                   pass->render_attachments_refs, pass->pipeline,
+        pass->pass->setup_metadata(pass->buffer_resources, pass->image_resources, pass->pipeline,
                                    *pass->descriptor_set);
         this->pass_data.push_back(std::move(pass));
     }
@@ -389,77 +362,122 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
     command.begin(vk::CommandBufferBeginInfo());
 
     for (std::unique_ptr<RenderPassData>& pass : this->pass_data) {
+        pass->render_attachment_infos.clear();
+        pass->buffer_barriers.clear();
+        pass->image_barriers.clear();
         // Pre render barriers
-        if (pass->dependency_info.has_value()) {
-            for (const auto& [index, buffer_barrier] :
-                 std::ranges::views::enumerate(pass->buffer_barriers)) {
-                buffer_barrier
-                    .setSrcAccessMask(pass->buffer_barriers_refs[index].get().get_access())
-                    .setSrcStageMask(pass->buffer_barriers_refs[index].get().get_stage());
-                pass->buffer_barriers_refs[index].get().set_barrier(buffer_barrier.dstAccessMask,
-                                                                    buffer_barrier.dstStageMask);
-            }
+        vk::DependencyInfo dependency_info;
+        for (const BufferBarrierBuilder& buffer_barrier_builder : pass->buffer_barrier_builders) {
+            Buffer& buffer = buffer_barrier_builder.buffer;
+            vk::BufferMemoryBarrier2 buffer_barrier;
+            buffer_barrier.setBuffer(buffer.get())
+                .setOffset(0)
+                .setSize(buffer.get_size())
+                .setSrcAccessMask(buffer.get_access())
+                .setSrcStageMask(buffer.get_stage())
+                .setDstAccessMask(buffer_barrier_builder.access)
+                .setDstStageMask(buffer_barrier_builder.stage);
+            pass->buffer_barriers.push_back(buffer_barrier);
+            buffer.set_barrier(buffer_barrier_builder.access, buffer_barrier_builder.stage);
+        }
 
-            for (const auto& [index, image] :
-                 std::ranges::views::enumerate(pass->image_barriers_refs)) {
-                // Range stores indices into the barrier vector by a pair of offset and mip range
-                const auto& range = pass->image_barrier_bundles[index];
-
-                // Update barrier state for each mip level
-                for (size_t i = 0; i < range.second; ++i) {
-                    size_t barrier_index = i + range.first;
-                    vk::ImageMemoryBarrier2& image_barrier = pass->image_barriers[barrier_index];
-                    image_barrier.setSrcAccessMask(image.get().get_access(i))
-                        .setSrcStageMask(image.get().get_stage(i))
-                        .setOldLayout(image.get().get_layout(i));
-                    image.get().set_barrier(image_barrier.newLayout, image_barrier.dstAccessMask,
-                                            image_barrier.dstStageMask, i);
-                }
-            }
-            command.pipelineBarrier2(*pass->dependency_info);
+        for (const ImageBarrierBuilder& image_barrier_builder : pass->image_barrier_builders) {
+            Image& image = image_barrier_builder.image;
+            vk::ImageMemoryBarrier2 image_barrier;
+            image_barrier.setImage(image.get())
+                .setSrcAccessMask(image.get_access(0))
+                .setSrcStageMask(image.get_stage(0))
+                .setOldLayout(image.get_layout(0))
+                .setDstAccessMask(image_barrier_builder.access)
+                .setDstStageMask(image_barrier_builder.stage)
+                .setNewLayout(image_barrier_builder.layout)
+                .setSubresourceRange(
+                    vk::ImageSubresourceRange(image.get_aspect(), 0, image.get_mip_count(), 0, 1));
+            pass->image_barriers.push_back(image_barrier);
+            image.set_barrier(image_barrier_builder.layout, image_barrier_builder.access,
+                              image_barrier_builder.stage);
         }
 
         if (pass->is_root) {
-            Image& image = this->swapchain_images[swapchain_index];
-            pass->swapchain_barrier.setImage(image.get())
+            Image& swapchain_image = this->swapchain_images[swapchain_index];
+            vk::ImageMemoryBarrier2 swapchain_barrier;
+            swapchain_barrier.setImage(swapchain_image.get())
                 .setSrcAccessMask(vk::AccessFlagBits2::eNone)
                 .setSrcStageMask(vk::PipelineStageFlagBits2::eNone)
                 .setOldLayout(vk::ImageLayout::eUndefined)
                 .setDstAccessMask(vk::AccessFlagBits2::eColorAttachmentWrite)
                 .setDstStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput)
                 .setNewLayout(vk::ImageLayout::eColorAttachmentOptimal)
-                .setSubresourceRange(vk::ImageSubresourceRange(image.get_aspect(), 0, 1, 0, 1));
-
-            command.pipelineBarrier2(*pass->swapchain_depedency_info);
+                .setSubresourceRange(
+                    vk::ImageSubresourceRange(swapchain_image.get_aspect(), 0, 1, 0, 1));
+            swapchain_image.set_barrier(vk::ImageLayout::eColorAttachmentOptimal,
+                                        vk::AccessFlagBits2::eColorAttachmentWrite,
+                                        vk::PipelineStageFlagBits2::eColorAttachmentOutput);
+            pass->image_barriers.push_back(swapchain_barrier);
         }
 
+        dependency_info.setBufferMemoryBarriers(pass->buffer_barriers)
+            .setImageMemoryBarriers(pass->image_barriers);
+        command.pipelineBarrier2(dependency_info);
+
+        for (const RenderAttachmentBuilder& attachment_builder : pass->render_attachment_builders) {
+            vk::RenderingAttachmentInfo render_attachment_info;
+            render_attachment_info.setImageView(attachment_builder.image.get().get_view())
+                .setImageLayout(attachment_builder.layout)
+                .setClearValue(attachment_builder.clear_value)
+                .setLoadOp(attachment_builder.load_op)
+                .setStoreOp(attachment_builder.store_op);
+            if (attachment_builder.resolve_image_identifier.has_value()) {
+                render_attachment_info
+                    .setResolveImageView(attachment_builder.resolve_image->get().get_view())
+                    .setResolveImageLayout(attachment_builder.resolve_layout)
+                    .setResolveMode(attachment_builder.resolve_mode);
+            }
+            pass->render_attachment_infos.push_back(render_attachment_info);
+        }
+
+        vk::RenderingInfo rendering_info;
         if (pass->is_root) {
-            Image& image = this->swapchain_images[swapchain_index];
-            pass->swapchain_attachment.setImageView(image.get_view());
-            pass->rendering_info.setRenderArea(
-                vk::Rect2D(vk::Offset2D(0, 0),
-                           vk::Extent2D(image.get_extent().width, image.get_extent().height)));
+            Image& swapchain_image = this->swapchain_images[swapchain_index];
+            vk::RenderingAttachmentInfo swapchain_attachment_info;
+            swapchain_attachment_info.setImageView(swapchain_image.get_view())
+                .setImageLayout(vk::ImageLayout::eColorAttachmentOptimal)
+                .setClearValue(vk::ClearValue(
+                    vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f})))
+                .setLoadOp(vk::AttachmentLoadOp::eClear)
+                .setStoreOp(vk::AttachmentStoreOp::eStore);
+            pass->render_attachment_infos.push_back(swapchain_attachment_info);
+            rendering_info.setRenderArea(
+                vk::Rect2D(vk::Offset2D(0, 0), vk::Extent2D(swapchain_image.get_extent().width,
+                                                            swapchain_image.get_extent().height)));
         } else {
-            Image& image = pass->attachment_images.front();
-            pass->rendering_info.setRenderArea(
-                vk::Rect2D(vk::Offset2D(0, 0),
-                           vk::Extent2D(image.get_extent().width, image.get_extent().height)));
+            vk::Extent3D extent = pass->render_attachment_builders.front().image.get().get_extent();
+            rendering_info.setRenderArea(
+                vk::Rect2D(vk::Offset2D(0, 0), vk::Extent2D(extent.width, extent.height)));
         }
 
-        command.beginRendering(pass->rendering_info);
-        pass->pass->render(command);
-        command.endRendering();
+        if (!pass->render_attachment_infos.empty()) {
+            rendering_info.setLayerCount(1).setColorAttachments(pass->render_attachment_infos);
+            command.beginRendering(rendering_info);
+            pass->pass->render(command);
+            command.endRendering();
+        }
 
         // Post render barriers
         if (pass->is_root) {
-            pass->swapchain_barrier.setSrcAccessMask(pass->swapchain_barrier.dstAccessMask)
-                .setSrcStageMask(pass->swapchain_barrier.dstStageMask)
-                .setOldLayout(pass->swapchain_barrier.newLayout)
+            Image& swapchain_image = this->swapchain_images[swapchain_index];
+            vk::ImageMemoryBarrier2 swapchain_barrier;
+            swapchain_barrier.setImage(swapchain_image.get())
+                .setSrcAccessMask(swapchain_image.get_access(0))
+                .setSrcStageMask(swapchain_image.get_stage(0))
+                .setOldLayout(swapchain_image.get_layout(0))
                 .setDstAccessMask(vk::AccessFlagBits2::eColorAttachmentRead)
                 .setDstStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput)
-                .setNewLayout(vk::ImageLayout::ePresentSrcKHR);
-
-            command.pipelineBarrier2(*pass->swapchain_depedency_info);
+                .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
+                .setSubresourceRange(
+                    vk::ImageSubresourceRange(swapchain_image.get_aspect(), 0, 1, 0, 1));
+            dependency_info.setBufferMemoryBarriers({}).setImageMemoryBarriers(swapchain_barrier);
+            command.pipelineBarrier2(dependency_info);
         }
     }
 
@@ -484,16 +502,6 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
 }
 
 ///////////////////////////////////////////////////////////
-void RenderGraph::rebound_resources() {
-    for (std::unique_ptr<RenderPassData>& render_pass_data : this->pass_data) {
-        for (auto& entry : render_pass_data->image_resources) {
-            entry.second = this->render_resources.get_image(entry.first);
-        }
-        for (auto& entry : render_pass_data->buffer_resources) {
-            entry.second = this->render_resources.get_buffer(entry.first);
-        }
-    }
-}
 
 ///////////////////////////////////////////////////////////
 vk::Semaphore RenderGraph::get_semaphore() {

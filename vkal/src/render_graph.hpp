@@ -85,6 +85,37 @@ struct GraphNode {
     std::vector<size_t> outs;
 };
 
+struct BufferBarrierBuilder {
+    // Identifier for later rebind operation
+    std::string identifier;
+    std::reference_wrapper<Buffer> buffer;
+    vk::AccessFlags2 access;
+    vk::PipelineStageFlags2 stage;
+};
+
+struct ImageBarrierBuilder {
+    // Identifier for later rebind operation
+    std::string identifier;
+    std::reference_wrapper<Image> image;
+    vk::AccessFlags2 access;
+    vk::PipelineStageFlags2 stage;
+    vk::ImageLayout layout;
+};
+
+struct RenderAttachmentBuilder {
+    // Identifiers for later rebind operation
+    std::string image_identifier;
+    std::optional<std::string> resolve_image_identifier;
+    std::reference_wrapper<Image> image;
+    std::optional<std::reference_wrapper<Image>> resolve_image;
+    vk::ImageLayout layout;
+    vk::ImageLayout resolve_layout;
+    vk::ResolveModeFlagBits resolve_mode;
+    vk::ClearValue clear_value;
+    vk::AttachmentLoadOp load_op;
+    vk::AttachmentStoreOp store_op;
+};
+
 struct RenderPassData {
     bool is_root;
 
@@ -95,22 +126,14 @@ struct RenderPassData {
     std::unordered_map<std::string, std::reference_wrapper<Image>> image_resources;
     std::unordered_map<std::string, std::reference_wrapper<Sampler>> sampler_resources;
 
-    std::vector<vk::RenderingAttachmentInfo> render_attachments;
-    std::unordered_map<std::string, std::reference_wrapper<vk::RenderingAttachmentInfo>>
-        render_attachments_refs;
-    std::vector<std::reference_wrapper<Image>> attachment_images;
-    vk::RenderingAttachmentInfo swapchain_attachment;
-    vk::RenderingInfo rendering_info;
+    std::vector<RenderAttachmentBuilder> render_attachment_builders;
+    std::vector<vk::RenderingAttachmentInfo> render_attachment_infos;
 
+    std::vector<BufferBarrierBuilder> buffer_barrier_builders;
     std::vector<vk::BufferMemoryBarrier2> buffer_barriers;
-    std::vector<std::reference_wrapper<Buffer>> buffer_barriers_refs;
-    std::vector<vk::ImageMemoryBarrier2> image_barriers;
-    std::vector<std::pair<size_t, size_t>> image_barrier_bundles;
-    std::vector<std::reference_wrapper<Image>> image_barriers_refs;
-    vk::ImageMemoryBarrier2 swapchain_barrier;
 
-    std::optional<vk::DependencyInfo> dependency_info;
-    std::optional<vk::DependencyInfo> swapchain_depedency_info;
+    std::vector<ImageBarrierBuilder> image_barrier_builders;
+    std::vector<vk::ImageMemoryBarrier2> image_barriers;
 
     std::unique_ptr<RenderPass> pass;
 };
@@ -136,7 +159,7 @@ class RenderGraph {
     void execute(uint32_t swapchain_index, vk::Queue queue, vk::CommandBuffer command,
                  vk::Semaphore semaphore);
 
-    void rebound_resources();
+    void rebind_resources();
 
     vk::Semaphore get_semaphore();
 

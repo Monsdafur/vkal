@@ -35,8 +35,6 @@ class VertexColorPass : public vkal::RenderPass {
     virtual void setup_metadata(
         const std::unordered_map<std::string, std::reference_wrapper<vkal::Buffer>>& buffers,
         const std::unordered_map<std::string, std::reference_wrapper<vkal::Image>>& images,
-        const std::unordered_map<std::string, std::reference_wrapper<vk::RenderingAttachmentInfo>>&
-            render_attachments,
         std::optional<std::reference_wrapper<vkal::Pipeline>> pipeline_opt,
         std::optional<std::reference_wrapper<vkal::DescriptorSet>> descriptor_sets_opt) override {
         this->vertex_buffer = &buffers.at("vertex buffer").get();
