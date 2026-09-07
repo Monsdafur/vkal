@@ -37,6 +37,7 @@ struct ResourceDescriptor {
     vk::DescriptorType type;
     uint32_t set;
     uint32_t binding;
+    uint32_t array_index = 0;
 };
 
 struct BufferResourceDescription {

@@ -217,11 +217,26 @@ void RenderGraph::generate_passes() {
 
         if (pass_params.pipeline.has_value()) {
             pass->pipeline = this->render_resources.get_pipeline(*pass_params.pipeline);
-            pass->descriptor_set = descriptor_set_ptr(DescriptorSetParams{
+            std::vector<std::reference_wrapper<DescriptorLayout>> set_layouts =
+                pass->pipeline->get().get_layout().get_descriptor_layouts();
+            uint32_t max_array_size = 1;
+            for (const DescriptorLayout& set_layout : set_layouts) {
+                std::vector<vk::DescriptorSetLayoutBinding> bindings = set_layout.get_bindings();
+                for (vk::DescriptorSetLayoutBinding& binding : bindings) {
+                    max_array_size = std::max(binding.descriptorCount, max_array_size);
+                }
+            }
+
+            DescriptorSetParams set_params = {
                 .vkal_device = this->vkal_device,
-                .vkal_layouts = pass->pipeline->get().get_layout().get_descriptor_layouts(),
+                .vkal_layouts = set_layouts,
                 .vkal_descriptor = this->vkal_descriptor,
-            });
+            };
+            if (max_array_size > 1) {
+                set_params.enable_dynamic_sized_array = true;
+                set_params.dynamic_array_size = max_array_size;
+            }
+            pass->descriptor_set = descriptor_set_ptr(set_params);
         }
         // Store image layouts by identifier to later setup render attachments
         std::unordered_map<std::string, vk::ImageLayout> layouts;
@@ -253,8 +268,7 @@ void RenderGraph::generate_passes() {
                     .set_index = buffer_description.resource_descriptor->set,
                     .type = buffer_description.resource_descriptor->type,
                     .binding = buffer_description.resource_descriptor->binding,
-                    .array_size = 1,
-                    .first_element = 0,
+                    .first_element = buffer_description.resource_descriptor->array_index,
                 });
                 pass->buffer_descriptor_data.push_back(BufferDescriptorData{
                     .identifier = identifier,
@@ -291,8 +305,7 @@ void RenderGraph::generate_passes() {
                     .set_index = image_description.resource_descriptor->set,
                     .type = image_description.resource_descriptor->type,
                     .binding = image_description.resource_descriptor->binding,
-                    .array_size = 1,
-                    .first_element = 0,
+                    .first_element = image_description.resource_descriptor->array_index,
                 });
                 pass->image_descriptor_data.push_back(ImageDescriptorData{
                     .identifier = identifier,
@@ -313,7 +326,6 @@ void RenderGraph::generate_passes() {
                     .set_index = sampler_resources.set,
                     .type = vk::DescriptorType::eSampler,
                     .binding = sampler_resources.binding,
-                    .array_size = 1,
                     .first_element = 0,
                 });
             }
@@ -529,7 +541,6 @@ void RenderGraph::rebind_resources() {
                 .set_index = descriptor_data.descriptor.set,
                 .type = descriptor_data.descriptor.type,
                 .binding = descriptor_data.descriptor.binding,
-                .array_size = 1,
                 .first_element = 0,
             });
         }
@@ -540,7 +551,6 @@ void RenderGraph::rebind_resources() {
                 .set_index = descriptor_data.descriptor.set,
                 .type = descriptor_data.descriptor.type,
                 .binding = descriptor_data.descriptor.binding,
-                .array_size = 1,
                 .first_element = 0,
             });
         }
