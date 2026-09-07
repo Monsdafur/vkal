@@ -62,6 +62,7 @@ class Surface {
     vk::Queue present_queue;
     vk::PhysicalDeviceSurfaceInfo2KHR surface_info;
     vk::SurfaceCapabilitiesKHR capabilities;
+    vk::Extent2D current_extent;
     uint32_t image_count;
     vk::SurfaceFormatKHR surface_format;
     vk::PresentModeKHR present_mode;

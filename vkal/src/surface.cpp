@@ -78,6 +78,7 @@ Surface::Surface(const SurfaceParams& params)
     this->update_surface_capabilities();
     this->setup_surface_settings(params);
     this->create_swapchain();
+    this->current_extent = this->capabilities.currentExtent;
 }
 
 ///////////////////////////////////////////////////////////
@@ -136,7 +137,10 @@ std::optional<uint32_t> Surface::acquire_next_frame(vk::Semaphore semaphore) {
     case vk::Result::eErrorOutOfDateKHR:
         this->vkal_device.get().waitIdle();
         this->update_surface_capabilities();
-        this->create_swapchain();
+        if (this->current_extent != this->capabilities.currentExtent) {
+            this->create_swapchain();
+            this->current_extent = this->capabilities.currentExtent;
+        }
         return std::nullopt;
     default:
         throw std::runtime_error(std::format("Failed to acquire next image with with code {}",
@@ -169,9 +173,13 @@ void Surface::present() {
         break;
     case vk::Result::eSuboptimalKHR:
     case vk::Result::eErrorOutOfDateKHR:
+
         this->vkal_device.get().waitIdle();
         this->update_surface_capabilities();
-        this->create_swapchain();
+        if (this->current_extent != this->capabilities.currentExtent) {
+            this->create_swapchain();
+            this->current_extent = this->capabilities.currentExtent;
+        }
         break;
     default:
         throw std::runtime_error(std::format("Failed to present image with with code {}",
