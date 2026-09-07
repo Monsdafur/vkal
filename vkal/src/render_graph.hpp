@@ -5,8 +5,6 @@
 #include "render_resources.hpp"
 #include "surface.hpp"
 
-#include <gtest/gtest_prod.h>
-
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -119,6 +117,17 @@ struct RenderAttachmentBuilder {
     vk::AttachmentStoreOp store_op;
 };
 
+struct BufferDescriptorData {
+    std::string identifier;
+    ResourceDescriptor descriptor;
+};
+
+struct ImageDescriptorData {
+    std::string identifier;
+    vk::ImageLayout layout;
+    ResourceDescriptor descriptor;
+};
+
 struct RenderPassData {
     bool is_root;
 
@@ -137,6 +146,9 @@ struct RenderPassData {
 
     std::vector<ImageBarrierBuilder> image_barrier_builders;
     std::vector<vk::ImageMemoryBarrier2> image_barriers;
+
+    std::vector<BufferDescriptorData> buffer_descriptor_data;
+    std::vector<ImageDescriptorData> image_descriptor_data;
 
     std::unique_ptr<RenderPass> pass;
 };
@@ -184,10 +196,6 @@ class RenderGraph {
 
     vk::Semaphore semaphore;
     vk::Fence fence;
-
-    FRIEND_TEST(RenderGraphTest, GraphGenerationTest);
-    FRIEND_TEST(RenderGraphTest, PruningTest);
-    FRIEND_TEST(RenderGraphTest, ToplogySortTest);
 };
 
 using RenderGraphPtr = std::unique_ptr<RenderGraph>;

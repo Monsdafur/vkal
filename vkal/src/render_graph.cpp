@@ -256,6 +256,10 @@ void RenderGraph::generate_passes() {
                     .array_size = 1,
                     .first_element = 0,
                 });
+                pass->buffer_descriptor_data.push_back(BufferDescriptorData{
+                    .identifier = identifier,
+                    .descriptor = *buffer_description.resource_descriptor,
+                });
             }
         }
         pass->buffer_barriers.reserve(pass->buffer_barrier_builders.size());
@@ -289,6 +293,11 @@ void RenderGraph::generate_passes() {
                     .binding = image_description.resource_descriptor->binding,
                     .array_size = 1,
                     .first_element = 0,
+                });
+                pass->image_descriptor_data.push_back(ImageDescriptorData{
+                    .identifier = identifier,
+                    .layout = barrier.layout,
+                    .descriptor = *image_description.resource_descriptor,
                 });
             }
         }
@@ -506,6 +515,53 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
 }
 
 ///////////////////////////////////////////////////////////
+void RenderGraph::rebind_resources() {
+    for (std::unique_ptr<RenderPassData>& pass_data : this->pass_data) {
+        for (auto& entry : pass_data->buffer_resources) {
+            entry.second = this->render_resources.get_buffer(entry.first);
+        }
+        for (auto& entry : pass_data->image_resources) {
+            entry.second = this->render_resources.get_image(entry.first);
+        }
+        for (const BufferDescriptorData& descriptor_data : pass_data->buffer_descriptor_data) {
+            pass_data->descriptor_set->write_buffer(BufferWriteParams{
+                .buffers = {pass_data->buffer_resources.at(descriptor_data.identifier)},
+                .set_index = descriptor_data.descriptor.set,
+                .type = descriptor_data.descriptor.type,
+                .binding = descriptor_data.descriptor.binding,
+                .array_size = 1,
+                .first_element = 0,
+            });
+        }
+        for (const ImageDescriptorData& descriptor_data : pass_data->image_descriptor_data) {
+            pass_data->descriptor_set->write_sampler(SamplerWriteParams{
+                .images = {pass_data->image_resources.at(descriptor_data.identifier)},
+                .layout = descriptor_data.layout,
+                .set_index = descriptor_data.descriptor.set,
+                .type = descriptor_data.descriptor.type,
+                .binding = descriptor_data.descriptor.binding,
+                .array_size = 1,
+                .first_element = 0,
+            });
+        }
+        for (RenderAttachmentBuilder& attachment_builder : pass_data->render_attachment_builders) {
+            attachment_builder.image =
+                pass_data->image_resources.at(attachment_builder.image_identifier);
+            if (attachment_builder.resolve_image_identifier.has_value()) {
+                attachment_builder.resolve_image =
+                    pass_data->image_resources.at(*attachment_builder.resolve_image_identifier);
+            }
+        }
+        for (BufferBarrierBuilder& barrier_builder : pass_data->buffer_barrier_builders) {
+            barrier_builder.buffer = pass_data->buffer_resources.at(barrier_builder.identifier);
+        }
+        for (ImageBarrierBuilder& barrier_builder : pass_data->image_barrier_builders) {
+            barrier_builder.image = pass_data->image_resources.at(barrier_builder.identifier);
+        }
+        pass_data->pass->on_rebound_resources(pass_data->buffer_resources,
+                                              pass_data->image_resources);
+    }
+}
 
 ///////////////////////////////////////////////////////////
 vk::Semaphore RenderGraph::get_semaphore() {
