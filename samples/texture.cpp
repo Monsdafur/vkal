@@ -212,13 +212,14 @@ int main() {
         });
 
         // Create graphics resource manager
-        vkal::RenderResources render_resources(vkal::RenderResourcesParams{
-            .vkal_device = *vkal_device,
-            .memory_allocator = *memory_allocator,
-        });
+        vkal::RenderResourcesPtr render_resources =
+            vkal::render_resources_ptr(vkal::RenderResourcesParams{
+                .vkal_device = *vkal_device,
+                .memory_allocator = *memory_allocator,
+            });
 
         // Create descriptor layout
-        render_resources.create_descriptor_layout(vkal::DescriptorLayoutResourceParams{
+        render_resources->create_descriptor_layout(vkal::DescriptorLayoutResourceParams{
             .identifier = "texture map descriptor layout",
             .bindings =
                 {
@@ -237,7 +238,7 @@ int main() {
                 },
         });
 
-        render_resources.create_descriptor_layout(vkal::DescriptorLayoutResourceParams{
+        render_resources->create_descriptor_layout(vkal::DescriptorLayoutResourceParams{
             .identifier = "screen descriptor layout",
             .bindings =
                 {
@@ -254,17 +255,17 @@ int main() {
         });
 
         // Create pipeline layouts
-        render_resources.create_pipeline_layout(vkal::PipelineLayoutResourceParams{
+        render_resources->create_pipeline_layout(vkal::PipelineLayoutResourceParams{
             .identifier = "texture map pipeline layout",
             .descriptor_layout_identifiers = {"texture map descriptor layout"},
         });
-        render_resources.create_pipeline_layout(vkal::PipelineLayoutResourceParams{
+        render_resources->create_pipeline_layout(vkal::PipelineLayoutResourceParams{
             .identifier = "screen pipeline layout",
             .descriptor_layout_identifiers = {"screen descriptor layout"},
         });
 
         // Craete pipelines
-        render_resources.create_graphics_pipeline(vkal::GraphicsPipelineResourceParams{
+        render_resources->create_graphics_pipeline(vkal::GraphicsPipelineResourceParams{
             .identifier = "texture map pipeline",
             .layout_identifier = "texture map pipeline layout",
             .shader_stages =
@@ -292,7 +293,7 @@ int main() {
             .topology = vk::PrimitiveTopology::eTriangleList,
         });
 
-        render_resources.create_graphics_pipeline(vkal::GraphicsPipelineResourceParams{
+        render_resources->create_graphics_pipeline(vkal::GraphicsPipelineResourceParams{
             .identifier = "screen pipeline",
             .layout_identifier = "screen pipeline layout",
             .shader_stages =
@@ -315,12 +316,12 @@ int main() {
         });
 
         // Load images
-        load_images(queue, command, *vkal_device, render_resources,
+        load_images(queue, command, *vkal_device, *render_resources,
                     {
                         "resources/textures/256x256/Bricks/Bricks_01-256x256.png",
                     });
 
-        render_resources.create_sampler(vkal::SamplerResourceParams{
+        render_resources->create_sampler(vkal::SamplerResourceParams{
             .identifier = "basic sampler",
             .address_mode = vk::SamplerAddressMode::eRepeat,
             .filter = vk::Filter::eLinear,
@@ -331,7 +332,7 @@ int main() {
             .max_anisotropy = 4.0f,
         });
 
-        render_resources.create_sampler(vkal::SamplerResourceParams{
+        render_resources->create_sampler(vkal::SamplerResourceParams{
             .identifier = "screen sampler",
             .address_mode = vk::SamplerAddressMode::eClampToBorder,
             .filter = vk::Filter::eNearest,
@@ -375,19 +376,19 @@ int main() {
         }
 
         // Create vertex buffer
-        add_device_local_buffer(queue, command, *vkal_device, render_resources, "vertex buffer",
+        add_device_local_buffer(queue, command, *vkal_device, *render_resources, "vertex buffer",
                                 sizeof(Vertex) * vertices.size(),
                                 vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlags(),
                                 vertices.data());
 
         // Create index buffer
-        add_device_local_buffer(queue, command, *vkal_device, render_resources, "index buffer",
+        add_device_local_buffer(queue, command, *vkal_device, *render_resources, "index buffer",
                                 sizeof(uint32_t) * indices.size(),
                                 vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlags(),
                                 indices.data());
 
         // Create uniform buffer
-        vkal::Buffer& uniform_buffer = render_resources.create_buffer(vkal::BufferResourceParams{
+        vkal::Buffer& uniform_buffer = render_resources->create_buffer(vkal::BufferResourceParams{
             .identifier = "uniform buffer",
             .size = sizeof(Uniform),
             .usage = vk::BufferUsageFlagBits::eUniformBuffer,
@@ -396,7 +397,7 @@ int main() {
         });
 
         // Create color attachments
-        render_resources.create_image(vkal::ImageResourceParams{
+        render_resources->create_image(vkal::ImageResourceParams{
             .identifier = "color attachment",
             .type = vk::ImageType::e2D,
             .view_type = vk::ImageViewType::e2D,
@@ -409,7 +410,7 @@ int main() {
             .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         });
 
-        render_resources.create_image(vkal::ImageResourceParams{
+        render_resources->create_image(vkal::ImageResourceParams{
             .identifier = "msaa",
             .type = vk::ImageType::e2D,
             .view_type = vk::ImageViewType::e2D,
@@ -427,7 +428,7 @@ int main() {
         vkal::RenderGraphPtr render_graph = vkal::render_graph_ptr(vkal::RenderGraphParams{
             .vkal_device = *vkal_device,
             .vkal_surface = *vkal_surface,
-            .render_resources = render_resources,
+            .render_resources = *render_resources,
             .vkal_descriptor = *vkal_descriptor,
         });
 
@@ -570,7 +571,7 @@ int main() {
 
         vkal_surface->set_resize_callback([&render_resources, &render_graph, &uniform,
                                            &texture_pass, &screen_pass](vk::Extent2D extent) {
-            render_resources.create_image(vkal::ImageResourceParams{
+            render_resources->create_image(vkal::ImageResourceParams{
                 .identifier = "color attachment",
                 .type = vk::ImageType::e2D,
                 .view_type = vk::ImageViewType::e2D,
@@ -584,7 +585,7 @@ int main() {
                 .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
             });
 
-            render_resources.create_image(vkal::ImageResourceParams{
+            render_resources->create_image(vkal::ImageResourceParams{
                 .identifier = "msaa",
                 .type = vk::ImageType::e2D,
                 .view_type = vk::ImageViewType::e2D,

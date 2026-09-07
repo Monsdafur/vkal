@@ -141,13 +141,14 @@ int main() {
         });
 
         // Create graphics resource manager
-        vkal::RenderResources render_resources(vkal::RenderResourcesParams{
-            .vkal_device = *vkal_device,
-            .memory_allocator = *memory_allocator,
-        });
+        vkal::RenderResourcesPtr render_resources =
+            vkal::render_resources_ptr(vkal::RenderResourcesParams{
+                .vkal_device = *vkal_device,
+                .memory_allocator = *memory_allocator,
+            });
 
         // Create descriptor layout
-        render_resources.create_descriptor_layout(vkal::DescriptorLayoutResourceParams{
+        render_resources->create_descriptor_layout(vkal::DescriptorLayoutResourceParams{
             .identifier = "default descriptor layout",
             .bindings =
                 {
@@ -158,13 +159,13 @@ int main() {
         });
 
         // Create graphcis pipeline
-        render_resources.create_pipeline_layout(vkal::PipelineLayoutResourceParams{
+        render_resources->create_pipeline_layout(vkal::PipelineLayoutResourceParams{
             .identifier = "default pipeline layout",
             .descriptor_layout_identifiers = {"default descriptor layout"},
         });
 
         vkal::Pipeline& vkal_graphics_pipeline =
-            render_resources.create_graphics_pipeline(vkal::GraphicsPipelineResourceParams{
+            render_resources->create_graphics_pipeline(vkal::GraphicsPipelineResourceParams{
                 .identifier = "graphics pipeline",
                 .layout_identifier = "default pipeline layout",
                 .shader_stages =
@@ -214,18 +215,18 @@ int main() {
 
         // Create vertex buffer
         vkal::Buffer& vertex_buffer = add_device_local_buffer(
-            queue, command, *vkal_device, render_resources, "vertex buffer",
+            queue, command, *vkal_device, *render_resources, "vertex buffer",
             sizeof(Vertex) * vertices.size(), vk::BufferUsageFlagBits::eVertexBuffer,
             vk::MemoryPropertyFlags(), vertices.data());
 
         // Create index buffer
         vkal::Buffer& index_buffer = add_device_local_buffer(
-            queue, command, *vkal_device, render_resources, "index buffer",
+            queue, command, *vkal_device, *render_resources, "index buffer",
             sizeof(uint32_t) * indices.size(), vk::BufferUsageFlagBits::eIndexBuffer,
             vk::MemoryPropertyFlags(), indices.data());
 
         // Craete uniform buffer
-        vkal::Buffer& uniform_buffer = render_resources.create_buffer(vkal::BufferResourceParams{
+        vkal::Buffer& uniform_buffer = render_resources->create_buffer(vkal::BufferResourceParams{
             .identifier = "uniform buffer",
             .size = sizeof(Uniform),
             .usage = vk::BufferUsageFlagBits::eUniformBuffer,
@@ -237,7 +238,7 @@ int main() {
         vkal::RenderGraphPtr render_graph = vkal::render_graph_ptr(vkal::RenderGraphParams{
             .vkal_device = *vkal_device,
             .vkal_surface = *vkal_surface,
-            .render_resources = render_resources,
+            .render_resources = *render_resources,
             .vkal_descriptor = *vkal_descriptor,
         });
 
