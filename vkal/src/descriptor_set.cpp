@@ -65,7 +65,7 @@ void DescriptorSet::write_buffer(const BufferWriteParams& write_params) {
     }
     vk::WriteDescriptorSet write_descriptor_set;
     write_descriptor_set.setBufferInfo(descriptor_buffer_infos)
-        .setDescriptorCount(write_params.array_size)
+        .setDescriptorCount(descriptor_buffer_infos.size())
         .setDstArrayElement(write_params.first_element)
         .setDescriptorType(write_params.type)
         .setDstSet(this->sets[write_params.set_index])
@@ -98,7 +98,7 @@ void DescriptorSet::write_sampler(const SamplerWriteParams& write_params) {
 
     vk::WriteDescriptorSet write_descriptor_set;
     write_descriptor_set.setImageInfo(descriptor_image_infos)
-        .setDescriptorCount(write_params.array_size)
+        .setDescriptorCount(descriptor_image_infos.size())
         .setDstArrayElement(write_params.first_element)
         .setDescriptorType(write_params.type)
         .setDstSet(this->sets[write_params.set_index])

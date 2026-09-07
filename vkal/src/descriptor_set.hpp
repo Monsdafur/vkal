@@ -17,7 +17,6 @@ struct BufferWriteParams {
     size_t set_index;
     vk::DescriptorType type;
     uint32_t binding;
-    uint32_t array_size = 1;
     uint32_t first_element = 0;
 };
 
@@ -28,7 +27,6 @@ struct SamplerWriteParams {
     size_t set_index;
     vk::DescriptorType type;
     uint32_t binding;
-    uint32_t array_size;
     uint32_t first_element;
 };
 
