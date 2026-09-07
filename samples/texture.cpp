@@ -19,7 +19,7 @@
 #include <print>
 #include <stdexcept>
 
-constexpr vk::Extent2D WINDOW_EXTENT = vk::Extent2D(1200, 800);
+constexpr vk::Extent2D WINDOW_EXTENT = vk::Extent2D(1200, 600);
 
 struct Vertex {
     glm::vec3 position;
@@ -527,6 +527,7 @@ int main() {
         }
 
         // Screen pass
+        ScreenPass* screen_pass;
         {
             std::vector<vkal::ImageResourceDescription> image_resrouces_descriptions;
             image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
@@ -552,30 +553,62 @@ int main() {
                 .binding = 1,
             });
 
+            std::unique_ptr<ScreenPass> screen_pass_ptr = std::make_unique<ScreenPass>();
+            screen_pass = screen_pass_ptr.get();
             vkal::RenderPassParams pass_params{
                 .identifier = "screen pass",
                 .is_root = true,
                 .image_resources = image_resrouces_descriptions,
                 .sampler_resources = sampler_resouces_description,
                 .pipeline = "screen pipeline",
-                .pass = std::make_unique<ScreenPass>(),
+                .pass = std::move(screen_pass_ptr),
             };
             render_graph->add_pass(std::move(pass_params));
         }
 
         render_graph->compile();
 
-        vkal_surface->set_resize_callback(
-            [&render_graph, &uniform, &texture_pass](vk::Extent2D extent) {
-                render_graph->reset_swapchain_images();
-                float width = static_cast<float>(extent.width);
-                float height = static_cast<float>(extent.height);
-                uniform.projection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
-                uniform.translation =
-                    glm::translate(glm::mat4(1.0f), glm::vec3(width, height, 0.0f) * 0.5f);
-                texture_pass->set_viewport_size(width, height);
-                texture_pass->set_scissor_size(extent);
+        vkal_surface->set_resize_callback([&render_resources, &render_graph, &uniform,
+                                           &texture_pass, &screen_pass](vk::Extent2D extent) {
+            render_resources.create_image(vkal::ImageResourceParams{
+                .identifier = "color attachment",
+                .type = vk::ImageType::e2D,
+                .view_type = vk::ImageViewType::e2D,
+                .extent = vk::Extent3D(extent, 1),
+                .format = vk::Format::eR8G8B8A8Srgb,
+                .sample_count = vk::SampleCountFlagBits::e1,
+                .aspects = vk::ImageAspectFlagBits::eColor,
+                .mip_levels = 1,
+                .usage =
+                    vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
+                .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
             });
+
+            render_resources.create_image(vkal::ImageResourceParams{
+                .identifier = "msaa",
+                .type = vk::ImageType::e2D,
+                .view_type = vk::ImageViewType::e2D,
+                .extent = vk::Extent3D(extent, 1),
+                .format = vk::Format::eR8G8B8A8Srgb,
+                .sample_count = vk::SampleCountFlagBits::e4,
+                .aspects = vk::ImageAspectFlagBits::eColor,
+                .mip_levels = 1,
+                .usage = vk::ImageUsageFlagBits::eColorAttachment |
+                         vk::ImageUsageFlagBits::eTransientAttachment,
+                .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+            });
+            render_graph->reset_swapchain_images();
+            render_graph->rebind_resources();
+            float width = static_cast<float>(extent.width);
+            float height = static_cast<float>(extent.height);
+            uniform.projection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
+            uniform.translation =
+                glm::translate(glm::mat4(1.0f), glm::vec3(width, height, 0.0f) * 0.5f);
+            texture_pass->set_viewport_size(width, height);
+            texture_pass->set_scissor_size(extent);
+            screen_pass->set_viewport_size(width, height);
+            screen_pass->set_scissor_size(extent);
+        });
 
         // Main loop
         SDL_Event event;
