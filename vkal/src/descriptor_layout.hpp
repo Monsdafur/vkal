@@ -26,7 +26,7 @@ class DescriptorLayout {
 
     vk::DescriptorSetLayout get();
 
-    const std::vector<vk::DescriptorSetLayoutBinding> get_bindings();
+    const std::vector<vk::DescriptorSetLayoutBinding>& get_bindings() const;
 
   private:
     Device& vkal_device;

@@ -28,7 +28,7 @@ vk::DescriptorSetLayout DescriptorLayout::get() {
 }
 
 ///////////////////////////////////////////////////////////
-const std::vector<vk::DescriptorSetLayoutBinding> DescriptorLayout::get_bindings() {
+const std::vector<vk::DescriptorSetLayoutBinding>& DescriptorLayout::get_bindings() const {
     return this->bindings;
 }
 
