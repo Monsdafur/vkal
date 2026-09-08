@@ -156,12 +156,13 @@ static void generate_mipmaps(vkal::Image& image, vk::CommandBuffer command) {
 }
 
 ///////////////////////////////////////////////////////////
-std::vector<std::reference_wrapper<vkal::Image>>
+std::map<std::string, std::reference_wrapper<vkal::Image>>
 load_images(vk::Queue queue, vk::CommandBuffer command, vkal::Device& device,
             vkal::RenderResources& render_resources,
             const std::vector<std::filesystem::path>& paths) {
     std::vector<SDL_Surface*> surfaces;
     std::vector<std::reference_wrapper<vkal::Image>> images;
+    std::vector<std::string> stems;
     std::vector<vkal::BufferPtr> stagings;
     for (const std::filesystem::path& path : paths) {
         // Load surface from source
@@ -198,6 +199,7 @@ load_images(vk::Queue queue, vk::CommandBuffer command, vkal::Device& device,
                      vk::ImageUsageFlagBits::eSampled,
             .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         }));
+        stems.push_back(stem);
 
         // Create staging buffers
         vk::DeviceSize base_size(surface->w * surface->h * 4);
@@ -236,5 +238,10 @@ load_images(vk::Queue queue, vk::CommandBuffer command, vkal::Device& device,
         SDL_DestroySurface(surface);
     }
 
-    return images;
+    std::map<std::string, std::reference_wrapper<vkal::Image>> image_map;
+    for (const auto& [index, image] : std::ranges::views::enumerate(images)) {
+        image_map.try_emplace(stems[index], image);
+    }
+
+    return image_map;
 }
