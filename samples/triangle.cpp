@@ -264,10 +264,22 @@ int main() {
                         .binding = 0,
                     },
             });
+
+            std::vector<vkal::RenderAttachmentParams> render_attachments = {
+                vkal::RenderAttachmentParams{
+                    .type = vkal::RenderAttachmentType::SWAPCHAIN,
+                    .identifier = "main attachment",
+                    .clear_value = vk::ClearValue(
+                        vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f})),
+                    .load_op = vk::AttachmentLoadOp::eClear,
+                    .store_op = vk::AttachmentStoreOp::eStore,
+                },
+            };
+
             vkal::RenderPassParams pass_params{
                 .identifier = "final pass",
-                .is_root = true,
                 .buffer_resources = resrouces_descriptions,
+                .render_attachments = render_attachments,
                 .pipeline = "graphics pipeline",
                 .pass = std::make_unique<VertexColorPass>(),
             };
