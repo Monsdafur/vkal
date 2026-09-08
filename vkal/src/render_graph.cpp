@@ -111,6 +111,8 @@ static std::vector<GraphNode> generate_graph(const std::vector<RenderPassParams>
                     node.ins.push_back(other_index);
                 }
             }
+
+            // TODO: Add support for write to write dependencies
         }
 
         nodes.push_back(node);
@@ -350,6 +352,7 @@ void RenderGraph::generate_passes() {
                     .type = attachment_params.type,
                     .image_identifier = attachment_params.image,
                     .resolve_image_identifier = attachment_params.resolve_image,
+                    .resolve_mode = attachment_params.resolve_mode,
                     .clear_value = attachment_params.clear_value,
                     .load_op = attachment_params.load_op,
                     .store_op = attachment_params.store_op,
@@ -390,7 +393,6 @@ void RenderGraph::generate_passes() {
                     attachment_builder.resolve_image = resolve_image;
                     attachment_builder.resolve_layout =
                         layouts.at(*attachment_builder.resolve_image_identifier);
-                    attachment_builder.resolve_mode = attachment_params.resolve_mode;
                 }
 
                 // Detect extent variation between render attachments
@@ -505,7 +507,8 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
                 vk::RenderingAttachmentInfo render_attachment_info;
                 render_attachment_info.setClearValue(attachment_builder.clear_value)
                     .setLoadOp(attachment_builder.load_op)
-                    .setStoreOp(attachment_builder.store_op);
+                    .setStoreOp(attachment_builder.store_op)
+                    .setResolveMode(attachment_builder.resolve_mode);
 
                 if (attachment_builder.type == RenderAttachmentType::SWAPCHAIN) {
                     render_extent = swapchain_image.get_extent();
@@ -515,8 +518,7 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
                             .setImageView(attachment_builder.image->get().get_view())
                             .setImageLayout(attachment_builder.layout);
                         render_attachment_info.setResolveImageView(swapchain_image.get_view())
-                            .setResolveImageLayout(attachment_builder.resolve_layout)
-                            .setResolveMode(attachment_builder.resolve_mode);
+                            .setResolveImageLayout(attachment_builder.resolve_layout);
                     } else { // If render attachment both writes to swapchain and contains a valid
                              // image the swapchain will be used as resolve image
                         render_attachment_info.setImageView(swapchain_image.get_view())
@@ -529,8 +531,7 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
                     if (attachment_builder.resolve_image.has_value()) {
                         render_attachment_info
                             .setResolveImageView(attachment_builder.resolve_image->get().get_view())
-                            .setResolveImageLayout(attachment_builder.resolve_layout)
-                            .setResolveMode(attachment_builder.resolve_mode);
+                            .setResolveImageLayout(attachment_builder.resolve_layout);
                     }
                 }
 

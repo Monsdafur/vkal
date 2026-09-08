@@ -29,10 +29,10 @@ struct RenderAttachmentParams {
     std::string identifier;
     std::optional<std::string> image;
     std::optional<std::string> resolve_image;
-    vk::ResolveModeFlagBits resolve_mode;
+    vk::ResolveModeFlagBits resolve_mode = vk::ResolveModeFlagBits::eNone;
     vk::ClearValue clear_value;
-    vk::AttachmentLoadOp load_op;
-    vk::AttachmentStoreOp store_op;
+    vk::AttachmentLoadOp load_op = vk::AttachmentLoadOp::eClear;
+    vk::AttachmentStoreOp store_op = vk::AttachmentStoreOp::eStore;
 };
 
 struct ResourceDescriptor {
