@@ -180,7 +180,7 @@ int main() {
                         },
                     },
                 .color_attachment_formats = {vk::Format::eB8G8R8A8Srgb},
-                .rasterization_sample_count = vk::SampleCountFlagBits::e1,
+                .rasterization_sample_count = vk::SampleCountFlagBits::e4,
                 .vertex_input_rate = vk::VertexInputRate::eVertex,
                 .vertex_stride = sizeof(Vertex),
                 .vertex_descriptions =
@@ -225,7 +225,7 @@ int main() {
             sizeof(uint32_t) * indices.size(), vk::BufferUsageFlagBits::eIndexBuffer,
             vk::MemoryPropertyFlags(), indices.data());
 
-        // Craete uniform buffer
+        // Create uniform buffer
         vkal::Buffer& uniform_buffer = render_resources->create_buffer(vkal::BufferResourceParams{
             .identifier = "uniform buffer",
             .size = sizeof(Uniform),
@@ -233,6 +233,22 @@ int main() {
             .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible |
                                  vk::MemoryPropertyFlagBits::eHostCoherent,
         });
+
+        // Create MSAA texture
+        vkal::ImageResourceParams mssa_params = {
+            .identifier = "msaa",
+            .type = vk::ImageType::e2D,
+            .view_type = vk::ImageViewType::e2D,
+            .extent = vk::Extent3D(WINDOW_EXTENT, 1),
+            .format = vk::Format::eB8G8R8A8Srgb,
+            .sample_count = vk::SampleCountFlagBits::e4,
+            .aspects = vk::ImageAspectFlagBits::eColor,
+            .mip_levels = 1,
+            .usage = vk::ImageUsageFlagBits::eColorAttachment |
+                     vk::ImageUsageFlagBits::eTransientAttachment,
+            .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+        };
+        render_resources->create_image(mssa_params);
 
         // Render graph
         vkal::RenderGraphPtr render_graph = vkal::render_graph_ptr(vkal::RenderGraphParams{
@@ -265,12 +281,26 @@ int main() {
                     },
             });
 
+            std::vector<vkal::ImageResourceDescription> image_resrouces_descriptions;
+            image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
+                .identifier = "msaa",
+                .barrier =
+                    vkal::ResourceBarrier{
+                        .preserve = false,
+                        .layout = vk::ImageLayout::eColorAttachmentOptimal,
+                        .access = vk::AccessFlagBits2::eColorAttachmentWrite,
+                        .stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                    },
+            });
+
             std::vector<vkal::RenderAttachmentParams> render_attachments = {
                 vkal::RenderAttachmentParams{
                     .type = vkal::RenderAttachmentType::SWAPCHAIN,
                     .identifier = "main attachment",
+                    .image = "msaa",
+                    .resolve_mode = vk::ResolveModeFlagBits::eAverage,
                     .clear_value = vk::ClearValue(
-                        vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f})),
+                        vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f})),
                     .load_op = vk::AttachmentLoadOp::eClear,
                     .store_op = vk::AttachmentStoreOp::eStore,
                 },
@@ -279,6 +309,7 @@ int main() {
             vkal::RenderPassParams pass_params{
                 .identifier = "final pass",
                 .buffer_resources = resrouces_descriptions,
+                .image_resources = image_resrouces_descriptions,
                 .render_attachments = render_attachments,
                 .pipeline = "graphics pipeline",
                 .pass = std::make_unique<VertexColorPass>(),
@@ -289,7 +320,12 @@ int main() {
         render_graph->compile();
 
         vkal_surface->set_resize_callback(
-            [&render_graph](vk::Extent2D extent) { render_graph->reset_swapchain_images(); });
+            [&render_graph, &render_resources, &mssa_params](vk::Extent2D extent) {
+                mssa_params.extent = vk::Extent3D(extent, 1);
+                render_resources->create_image(mssa_params);
+                render_graph->reset_swapchain_images();
+                render_graph->rebind_resources();
+            });
 
         // Main loop
         SDL_Event event;
