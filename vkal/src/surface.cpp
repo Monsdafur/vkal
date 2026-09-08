@@ -96,7 +96,7 @@ vk::Semaphore& Surface::get_current_semaphore() {
 }
 
 ///////////////////////////////////////////////////////////
-void Surface::set_resize_callback(std::function<void(vk::Extent2D)> callback) {
+void Surface::set_resize_callback(std::function<void(const vk::SurfaceCapabilitiesKHR&)> callback) {
     this->resize_callback = callback;
 }
 
@@ -269,7 +269,7 @@ void Surface::create_swapchain() {
         this->images.push_back(std::move(vkal_image));
     }
 
-    this->resize_callback(this->capabilities.currentExtent);
+    this->resize_callback(this->capabilities);
 
     // Create semaphores
     for (vk::Semaphore semaphore : this->semaphores) {
@@ -290,6 +290,11 @@ size_t Surface::get_image_count() const {
 ///////////////////////////////////////////////////////////
 Image& Surface::get_image(size_t index) {
     return *this->images.at(index);
+}
+
+///////////////////////////////////////////////////////////
+const vk::SurfaceCapabilitiesKHR& Surface::get_capabilities() const {
+    return this->capabilities;
 }
 
 } // namespace vkal
