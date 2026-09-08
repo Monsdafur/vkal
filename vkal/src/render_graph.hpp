@@ -11,6 +11,12 @@
 
 namespace vkal {
 
+enum RenderAttachmentType {
+    SWAPCHAIN,
+    COLOR,
+    DEPTH,
+};
+
 struct ResourceBarrier {
     bool preserve = true;
     vk::ImageLayout layout;
@@ -19,13 +25,9 @@ struct ResourceBarrier {
 };
 
 struct RenderAttachmentParams {
-    enum Type {
-        COLOR,
-        DEPTH,
-    };
-
+    RenderAttachmentType type;
     std::string identifier;
-    std::string image;
+    std::optional<std::string> image;
     std::optional<std::string> resolve_image;
     vk::ResolveModeFlagBits resolve_mode;
     vk::ClearValue clear_value;
@@ -56,12 +58,11 @@ struct SamplerResourceDescription {
     std::string identifier;
     uint32_t set;
     uint32_t binding;
+    uint32_t array_index = 0;
 };
 
 struct RenderPassParams {
     std::string identifier;
-    bool is_root = false;
-
     std::vector<BufferResourceDescription> buffer_resources;
     std::vector<ImageResourceDescription> image_resources;
     std::vector<RenderAttachmentParams> render_attachments;
@@ -105,10 +106,12 @@ struct ImageBarrierBuilder {
 };
 
 struct RenderAttachmentBuilder {
+    RenderAttachmentType type;
     // Identifiers for later rebind operation
-    std::string image_identifier;
+    std::optional<std::string> image_identifier;
     std::optional<std::string> resolve_image_identifier;
-    std::reference_wrapper<Image> image;
+    // Images are also optional due to render attachment can possibly writing to a swapchain
+    std::optional<std::reference_wrapper<Image>> image;
     std::optional<std::reference_wrapper<Image>> resolve_image;
     vk::ImageLayout layout;
     vk::ImageLayout resolve_layout;
@@ -130,8 +133,6 @@ struct ImageDescriptorData {
 };
 
 struct RenderPassData {
-    bool is_root;
-
     std::optional<std::reference_wrapper<Pipeline>> pipeline;
     DescriptorSetPtr descriptor_set;
 
@@ -152,6 +153,7 @@ struct RenderPassData {
     std::vector<ImageDescriptorData> image_descriptor_data;
 
     std::unique_ptr<RenderPass> pass;
+    bool write_swapchain = false;
 };
 
 class RenderGraph {

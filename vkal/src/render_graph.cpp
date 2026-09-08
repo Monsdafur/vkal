@@ -126,9 +126,17 @@ std::vector<std::pair<GraphNode, size_t>> prune(const std::vector<RenderPassPara
     std::vector<GraphNode> stack;
     std::set<size_t> visited;
 
-    // Find root node
+    // The root node is the ndoe that contains a render attachment that writes to the swapchain
     for (const GraphNode& node : nodes) {
-        if (pass_params[node.pass_index].is_root) {
+        bool is_root = false;
+        for (const RenderAttachmentParams& attachment_params :
+             pass_params[node.pass_index].render_attachments) {
+            if (attachment_params.type == RenderAttachmentType::SWAPCHAIN) {
+                is_root = true;
+                break;
+            }
+        }
+        if (is_root) {
             stack.push_back(node);
         }
     }
@@ -210,6 +218,7 @@ void RenderGraph::compile() {
 
 ///////////////////////////////////////////////////////////
 void RenderGraph::generate_passes() {
+    debug(std::format("Compiling render graph ({} passes)", this->pass_params.size()));
     for (size_t pass_index : this->pass_order) {
         RenderPassParams& pass_params = this->pass_params[pass_index];
 
@@ -317,55 +326,97 @@ void RenderGraph::generate_passes() {
         pass->image_barriers.reserve(pass->image_barrier_builders.size() + 1);
 
         // Collect all sampler resources
-        for (const SamplerResourceDescription& sampler_resources : pass_params.sampler_resources) {
-            const std::string& identifier = sampler_resources.identifier;
+        for (const SamplerResourceDescription& sampler_resource : pass_params.sampler_resources) {
+            const std::string& identifier = sampler_resource.identifier;
             Sampler& sampler = this->render_resources.get_sampler(identifier);
             if (pass->descriptor_set != nullptr) {
                 pass->descriptor_set->write_sampler(SamplerWriteParams{
                     .samplers = {sampler},
-                    .set_index = sampler_resources.set,
+                    .set_index = sampler_resource.set,
                     .type = vk::DescriptorType::eSampler,
-                    .binding = sampler_resources.binding,
-                    .first_element = 0,
+                    .binding = sampler_resource.binding,
+                    .first_element = sampler_resource.array_index,
                 });
             }
             pass->sampler_resources.try_emplace(identifier, sampler);
         }
 
-        pass->is_root = pass_params.is_root;
-        // if pass is root then attachments other than the swapchain are irrelevant
-        if (!pass->is_root) {
+        // Render attachments are only relevant if the pipeline is a graphics pipeline
+        vk::Extent3D required_extent(0, 0, 0);
+        if (pass->pipeline.has_value() &&
+            pass->pipeline->get().get_bind_point() == vk::PipelineBindPoint::eGraphics) {
             for (const RenderAttachmentParams& attachment_params : pass_params.render_attachments) {
-                Image& image = pass->image_resources.at(attachment_params.image);
                 RenderAttachmentBuilder attachment_builder = {
+                    .type = attachment_params.type,
                     .image_identifier = attachment_params.image,
                     .resolve_image_identifier = attachment_params.resolve_image,
-                    .image = image,
-                    .layout = layouts.at(attachment_params.image),
-                    .resolve_mode = attachment_params.resolve_mode,
                     .clear_value = attachment_params.clear_value,
                     .load_op = attachment_params.load_op,
                     .store_op = attachment_params.store_op,
                 };
-                if (attachment_builder.resolve_image_identifier.has_value()) {
-                    attachment_builder.resolve_image =
-                        pass->image_resources.at(*attachment_builder.resolve_image_identifier);
+                vk::Extent3D attachment_extent(0, 0, 0);
+                if (attachment_params.image.has_value()) {
+                    Image& image = pass->image_resources.at(*attachment_params.image);
+                    attachment_builder.image = image;
+                    attachment_builder.layout = layouts.at(*attachment_params.image);
+                    attachment_extent = image.get_extent();
+                }
+
+                if (attachment_params.type == RenderAttachmentType::SWAPCHAIN) {
+                    pass->write_swapchain = true;
+                    vk::Extent3D swapchain_extent =
+                        this->swapchain_images.front().get().get_extent();
+                    if (attachment_extent.width == 0) {
+                        attachment_extent = swapchain_extent;
+                    } else if (attachment_extent != swapchain_extent) {
+                        throw std::runtime_error("Render graph compite error (Swapchain "
+                                                 "image and main image extent mismatch)");
+                    }
+
+                    // Swapchain layout is guaranteed to be color attachment optimal
+                    if (attachment_builder.image.has_value()) {
+                        attachment_builder.resolve_layout =
+                            vk::ImageLayout::eColorAttachmentOptimal;
+                    } else {
+                        attachment_builder.layout = vk::ImageLayout::eColorAttachmentOptimal;
+                    }
+                } else if (attachment_builder.resolve_image_identifier.has_value()) {
+                    Image& resolve_image =
+                        pass->image_resources.at(*attachment_params.resolve_image);
+                    if (attachment_extent != resolve_image.get_extent()) {
+                        throw std::runtime_error("Render graph compite error (Main "
+                                                 "image and resolve image extent mismatch)");
+                    }
+                    attachment_builder.resolve_image = resolve_image;
                     attachment_builder.resolve_layout =
                         layouts.at(*attachment_builder.resolve_image_identifier);
+                    attachment_builder.resolve_mode = attachment_params.resolve_mode;
+                }
+
+                // Detect extent variation between render attachments
+                if (required_extent.width == 0) {
+                    required_extent = attachment_extent;
+                } else if (required_extent != attachment_extent) {
+                    throw std::runtime_error(
+                        "Render graph compile error (Attachments have different extents)");
                 }
 
                 pass->render_attachment_builders.push_back(std::move(attachment_builder));
             }
             pass->render_attachment_infos.reserve(pass->render_attachment_builders.size());
-        } else {
-            pass->render_attachment_infos.reserve(1);
         }
 
         pass->pass = std::move(pass_params.pass);
+        std::optional<std::reference_wrapper<DescriptorSet>> descriptor_set = std::nullopt;
+        if (pass->descriptor_set != nullptr) {
+            descriptor_set = *pass->descriptor_set;
+        }
         pass->pass->setup_metadata(pass->buffer_resources, pass->image_resources, pass->pipeline,
-                                   *pass->descriptor_set);
+                                   descriptor_set);
         this->pass_data.push_back(std::move(pass));
     }
+
+    debug("Compiled render graph");
 }
 
 ///////////////////////////////////////////////////////////
@@ -384,10 +435,13 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
     command.reset();
     command.begin(vk::CommandBufferBeginInfo());
 
+    Image& swapchain_image = this->swapchain_images[swapchain_index];
+
     for (std::unique_ptr<RenderPassData>& pass : this->pass_data) {
         pass->render_attachment_infos.clear();
         pass->buffer_barriers.clear();
         pass->image_barriers.clear();
+
         // Pre render barriers
         vk::DependencyInfo dependency_info;
         for (const BufferBarrierBuilder& buffer_barrier_builder : pass->buffer_barrier_builders) {
@@ -423,8 +477,7 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
                               image_barrier_builder.stage);
         }
 
-        if (pass->is_root) {
-            Image& swapchain_image = this->swapchain_images[swapchain_index];
+        if (pass->write_swapchain) {
             vk::ImageMemoryBarrier2 swapchain_barrier;
             swapchain_barrier.setImage(swapchain_image.get())
                 .setSrcAccessMask(vk::AccessFlagBits2::eNone)
@@ -445,52 +498,61 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
             .setImageMemoryBarriers(pass->image_barriers);
         command.pipelineBarrier2(dependency_info);
 
-        for (const RenderAttachmentBuilder& attachment_builder : pass->render_attachment_builders) {
-            vk::RenderingAttachmentInfo render_attachment_info;
-            render_attachment_info.setImageView(attachment_builder.image.get().get_view())
-                .setImageLayout(attachment_builder.layout)
-                .setClearValue(attachment_builder.clear_value)
-                .setLoadOp(attachment_builder.load_op)
-                .setStoreOp(attachment_builder.store_op);
-            if (attachment_builder.resolve_image_identifier.has_value()) {
-                render_attachment_info
-                    .setResolveImageView(attachment_builder.resolve_image->get().get_view())
-                    .setResolveImageLayout(attachment_builder.resolve_layout)
-                    .setResolveMode(attachment_builder.resolve_mode);
+        vk::Extent3D render_extent;
+        if (!pass->render_attachment_builders.empty()) {
+            for (const auto& [index, attachment_builder] :
+                 std::ranges::views::enumerate(pass->render_attachment_builders)) {
+                vk::RenderingAttachmentInfo render_attachment_info;
+                render_attachment_info.setClearValue(attachment_builder.clear_value)
+                    .setLoadOp(attachment_builder.load_op)
+                    .setStoreOp(attachment_builder.store_op);
+
+                if (attachment_builder.type == RenderAttachmentType::SWAPCHAIN) {
+                    render_extent = swapchain_image.get_extent();
+
+                    if (attachment_builder.image.has_value()) {
+                        render_attachment_info
+                            .setImageView(attachment_builder.image->get().get_view())
+                            .setImageLayout(attachment_builder.layout);
+                        render_attachment_info.setResolveImageView(swapchain_image.get_view())
+                            .setResolveImageLayout(attachment_builder.resolve_layout)
+                            .setResolveMode(attachment_builder.resolve_mode);
+                    } else { // If render attachment both writes to swapchain and contains a valid
+                             // image the swapchain will be used as resolve image
+                        render_attachment_info.setImageView(swapchain_image.get_view())
+                            .setImageLayout(attachment_builder.layout);
+                    }
+                } else {
+                    render_extent = attachment_builder.image->get().get_extent();
+                    render_attachment_info.setImageView(attachment_builder.image->get().get_view())
+                        .setImageLayout(attachment_builder.layout);
+                    if (attachment_builder.resolve_image.has_value()) {
+                        render_attachment_info
+                            .setResolveImageView(attachment_builder.resolve_image->get().get_view())
+                            .setResolveImageLayout(attachment_builder.resolve_layout)
+                            .setResolveMode(attachment_builder.resolve_mode);
+                    }
+                }
+
+                pass->render_attachment_infos.push_back(render_attachment_info);
             }
-            pass->render_attachment_infos.push_back(render_attachment_info);
-        }
 
-        vk::RenderingInfo rendering_info;
-        if (pass->is_root) {
-            Image& swapchain_image = this->swapchain_images[swapchain_index];
-            vk::RenderingAttachmentInfo swapchain_attachment_info;
-            swapchain_attachment_info.setImageView(swapchain_image.get_view())
-                .setImageLayout(vk::ImageLayout::eColorAttachmentOptimal)
-                .setClearValue(vk::ClearValue(
-                    vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f})))
-                .setLoadOp(vk::AttachmentLoadOp::eClear)
-                .setStoreOp(vk::AttachmentStoreOp::eStore);
-            pass->render_attachment_infos.push_back(swapchain_attachment_info);
-            rendering_info.setRenderArea(
-                vk::Rect2D(vk::Offset2D(0, 0), vk::Extent2D(swapchain_image.get_extent().width,
-                                                            swapchain_image.get_extent().height)));
-        } else {
-            vk::Extent3D extent = pass->render_attachment_builders.front().image.get().get_extent();
-            rendering_info.setRenderArea(
-                vk::Rect2D(vk::Offset2D(0, 0), vk::Extent2D(extent.width, extent.height)));
-        }
-
-        if (!pass->render_attachment_infos.empty()) {
-            rendering_info.setLayerCount(1).setColorAttachments(pass->render_attachment_infos);
+            // Assume all render attachment images are of the same extent
+            vk::RenderingInfo rendering_info;
+            rendering_info
+                .setRenderArea(vk::Rect2D(vk::Offset2D(0, 0),
+                                          vk::Extent2D(render_extent.width, render_extent.height)))
+                .setLayerCount(1)
+                .setColorAttachments(pass->render_attachment_infos);
             command.beginRendering(rendering_info);
             pass->pass->render(command);
             command.endRendering();
+        } else { // If pass contains no render attachments proceed without render commands
+            pass->pass->render(command);
         }
 
         // Post render barriers
-        if (pass->is_root) {
-            Image& swapchain_image = this->swapchain_images[swapchain_index];
+        if (pass->write_swapchain) {
             vk::ImageMemoryBarrier2 swapchain_barrier;
             swapchain_barrier.setImage(swapchain_image.get())
                 .setSrcAccessMask(swapchain_image.get_access(0))
@@ -555,11 +617,13 @@ void RenderGraph::rebind_resources() {
             });
         }
         for (RenderAttachmentBuilder& attachment_builder : pass_data->render_attachment_builders) {
-            attachment_builder.image =
-                pass_data->image_resources.at(attachment_builder.image_identifier);
-            if (attachment_builder.resolve_image_identifier.has_value()) {
-                attachment_builder.resolve_image =
-                    pass_data->image_resources.at(*attachment_builder.resolve_image_identifier);
+            if (attachment_builder.image_identifier.has_value()) {
+                attachment_builder.image =
+                    pass_data->image_resources.at(*attachment_builder.image_identifier);
+                if (attachment_builder.resolve_image_identifier.has_value()) {
+                    attachment_builder.resolve_image =
+                        pass_data->image_resources.at(*attachment_builder.resolve_image_identifier);
+                }
             }
         }
         for (BufferBarrierBuilder& barrier_builder : pass_data->buffer_barrier_builders) {
