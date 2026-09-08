@@ -159,7 +159,6 @@ TEST(RenderGraphTest, PruningTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "root pass",
-        .is_root = true,
         .buffer_resources =
             {
                 BufferResourceDescription{
@@ -169,6 +168,17 @@ TEST(RenderGraphTest, PruningTest) {
                 BufferResourceDescription{
                     .identifier = "C-D&r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
+            },
+        .render_attachments =
+            {
+                vkal::RenderAttachmentParams{
+                    .type = vkal::RenderAttachmentType::SWAPCHAIN,
+                    .identifier = "swapchain attachment",
+                    .clear_value = vk::ClearValue(
+                        vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f})),
+                    .load_op = vk::AttachmentLoadOp::eClear,
+                    .store_op = vk::AttachmentStoreOp::eStore,
                 },
             },
     });
@@ -236,7 +246,6 @@ TEST(RenderGraphTest, ToplogySortTest) {
 
     pass_params.push_back(RenderPassParams{
         .identifier = "root pass",
-        .is_root = true,
         .buffer_resources =
             {
                 BufferResourceDescription{
@@ -246,6 +255,17 @@ TEST(RenderGraphTest, ToplogySortTest) {
                 BufferResourceDescription{
                     .identifier = "C-D&r",
                     .barrier = ResourceBarrier{.access = vk::AccessFlagBits2::eShaderRead},
+                },
+            },
+        .render_attachments =
+            {
+                vkal::RenderAttachmentParams{
+                    .type = vkal::RenderAttachmentType::SWAPCHAIN,
+                    .identifier = "swapchain attachment",
+                    .clear_value = vk::ClearValue(
+                        vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f})),
+                    .load_op = vk::AttachmentLoadOp::eClear,
+                    .store_op = vk::AttachmentStoreOp::eStore,
                 },
             },
     });
