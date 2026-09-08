@@ -21,8 +21,7 @@
 #include <ranges>
 #include <stdexcept>
 
-constexpr vk::Extent2D WINDOW_EXTENT = vk::Extent2D(1200, 600);
-constexpr uint32_t SPRITE_COUNT = 1600;
+constexpr uint32_t SPRITE_COUNT = 1000;
 
 float random_range(std::mt19937& generator, float min, float max) {
     std::uniform_real_distribution<float> distribution(min, max);
@@ -81,73 +80,18 @@ class CopyPass : public vkal::RenderPass {
     vkal::Buffer* sprite_buffer;
 };
 
-class ScreenPass : public vkal::RenderPass {
-  public:
-    ScreenPass() {
-        this->viewport.x = 0.0f;
-        this->viewport.y = 0.0f;
-        this->viewport.width = static_cast<float>(WINDOW_EXTENT.width);
-        this->viewport.height = static_cast<float>(WINDOW_EXTENT.height);
-        this->viewport.minDepth = 0.0f;
-        this->viewport.maxDepth = 1.0f;
-        this->scissor.offset.x = 0;
-        this->scissor.offset.y = 0;
-        this->scissor.extent = WINDOW_EXTENT;
-    }
-
-    virtual void setup_metadata(
-        const std::unordered_map<std::string, std::reference_wrapper<vkal::Buffer>>& buffers,
-        const std::unordered_map<std::string, std::reference_wrapper<vkal::Image>>& images,
-        std::optional<std::reference_wrapper<vkal::Pipeline>> pipeline_opt,
-        std::optional<std::reference_wrapper<vkal::DescriptorSet>> descriptor_sets_opt) override {
-        if (pipeline_opt.has_value()) {
-            this->pipeline = &pipeline_opt->get();
-            if (descriptor_sets_opt.has_value()) {
-                this->descriptor_sets = &descriptor_sets_opt->get();
-            }
-        }
-    }
-
-    virtual void render(vk::CommandBuffer command) override {
-        command.setViewport(0, this->viewport);
-        command.setScissor(0, this->scissor);
-
-        vkal::Pipeline& graphics_pipeline = *pipeline;
-        command.bindPipeline(graphics_pipeline.get_bind_point(), graphics_pipeline.get());
-        vk::DescriptorSet set = descriptor_sets->get(0);
-        command.bindDescriptorSets2(vk::BindDescriptorSetsInfo(
-            vk::ShaderStageFlagBits::eVertex, graphics_pipeline.get_layout().get(), 0, 1, &set, 0));
-        command.draw(4, 1, 0, 0);
-    }
-
-    void set_viewport_size(float width, float height) {
-        this->viewport.width = width;
-        this->viewport.height = height;
-    }
-
-    void set_scissor_size(const vk::Extent2D& extent) {
-        this->scissor.extent = extent;
-    }
-
-  private:
-    vk::Viewport viewport;
-    vk::Rect2D scissor;
-    vkal::Pipeline* pipeline;
-    vkal::DescriptorSet* descriptor_sets;
-};
-
 class TexturePass : public vkal::RenderPass {
   public:
-    TexturePass() {
+    TexturePass(const vk::Extent2D& extent) {
         this->viewport.x = 0.0f;
         this->viewport.y = 0.0f;
-        this->viewport.width = static_cast<float>(WINDOW_EXTENT.width);
-        this->viewport.height = static_cast<float>(WINDOW_EXTENT.height);
+        this->viewport.width = static_cast<float>(extent.width);
+        this->viewport.height = static_cast<float>(extent.height);
         this->viewport.minDepth = 0.0f;
         this->viewport.maxDepth = 1.0f;
         this->scissor.offset.x = 0;
         this->scissor.offset.y = 0;
-        this->scissor.extent = WINDOW_EXTENT;
+        this->scissor.extent = extent;
     }
 
     virtual void setup_metadata(
@@ -208,8 +152,8 @@ int main() {
             throw std::runtime_error(SDL_GetError());
         }
 
-        SDL_Window* window = SDL_CreateWindow("Texture", WINDOW_EXTENT.width, WINDOW_EXTENT.height,
-                                              SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+        SDL_Window* window =
+            SDL_CreateWindow("Texture", 1920, 1080, SDL_WINDOW_VULKAN | SDL_WINDOW_FULLSCREEN);
         if (!window) {
             throw std::runtime_error(SDL_GetError());
         }
@@ -246,6 +190,7 @@ int main() {
                     vk::PresentModeKHR::eMailbox,
                 },
         });
+        vk::Extent2D window_extent = vkal_surface->get_capabilities().currentExtent;
 
         // Create memory allocator
         vkal::MemoryAllocatorPtr memory_allocator =
@@ -292,30 +237,10 @@ int main() {
                 },
         });
 
-        render_resources->create_descriptor_layout(vkal::DescriptorLayoutResourceParams{
-            .identifier = "screen descriptor layout",
-            .bindings =
-                {
-                    vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eSampledImage, 1,
-                                                   vk::ShaderStageFlagBits::eFragment),
-                    vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eSampler, 1,
-                                                   vk::ShaderStageFlagBits::eFragment),
-                },
-            .binding_flags =
-                {
-                    vk::DescriptorBindingFlags(),
-                    vk::DescriptorBindingFlags(),
-                },
-        });
-
         // Create pipeline layouts
         render_resources->create_pipeline_layout(vkal::PipelineLayoutResourceParams{
             .identifier = "texture map pipeline layout",
             .descriptor_layout_identifiers = {"texture map descriptor layout"},
-        });
-        render_resources->create_pipeline_layout(vkal::PipelineLayoutResourceParams{
-            .identifier = "screen pipeline layout",
-            .descriptor_layout_identifiers = {"screen descriptor layout"},
         });
 
         // Craete pipelines
@@ -333,7 +258,7 @@ int main() {
                         .stage = vk::ShaderStageFlagBits::eFragment,
                     },
                 },
-            .color_attachment_formats = {vk::Format::eR8G8B8A8Srgb},
+            .color_attachment_formats = {vk::Format::eB8G8R8A8Srgb},
             .rasterization_sample_count = vk::SampleCountFlagBits::e4,
             .vertex_input_rate = vk::VertexInputRate::eVertex,
             .vertex_stride = sizeof(Vertex),
@@ -345,28 +270,6 @@ int main() {
                                                         offsetof(Vertex, uv)),
                 },
             .topology = vk::PrimitiveTopology::eTriangleList,
-        });
-
-        render_resources->create_graphics_pipeline(vkal::GraphicsPipelineResourceParams{
-            .identifier = "screen pipeline",
-            .layout_identifier = "screen pipeline layout",
-            .shader_stages =
-                {
-                    vkal::ShaderStage{
-                        .file_path = "resources/shaders/screen.spv",
-                        .stage = vk::ShaderStageFlagBits::eVertex,
-                    },
-                    vkal::ShaderStage{
-                        .file_path = "resources/shaders/screen.spv",
-                        .stage = vk::ShaderStageFlagBits::eFragment,
-                    },
-                },
-            .color_attachment_formats = {vk::Format::eB8G8R8A8Srgb},
-            .rasterization_sample_count = vk::SampleCountFlagBits::e1,
-            .vertex_input_rate = vk::VertexInputRate::eVertex,
-            .vertex_stride = sizeof(Vertex),
-            .vertex_descriptions = {},
-            .topology = vk::PrimitiveTopology::eTriangleFan,
         });
 
         // Load images
@@ -430,8 +333,8 @@ int main() {
 
         Uniform uniform;
         {
-            float width = static_cast<float>(WINDOW_EXTENT.width);
-            float height = static_cast<float>(WINDOW_EXTENT.height);
+            float width = static_cast<float>(window_extent.width);
+            float height = static_cast<float>(window_extent.height);
             uniform.projection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
             uniform.view = glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f),
                                        glm::vec3(0.0f, 1.0f, 0.0f));
@@ -440,12 +343,11 @@ int main() {
         std::array<Sprite, SPRITE_COUNT> sprites;
         std::array<float, SPRITE_COUNT> angular_velocities;
         for (const auto& [index, sprite] : std::ranges::views::enumerate(sprites)) {
-            sprite.position.x =
-                random_range(generator, 50.0f, static_cast<float>(WINDOW_EXTENT.width) - 50.0f);
-            sprite.position.y =
-                random_range(generator, 50.0f, static_cast<float>(WINDOW_EXTENT.height) - 50.0f);
+            sprite.position.x = random_range(generator, 0.0f, 1920.0f);
+            sprite.position.y = random_range(generator, 0.0f, 1080.0f);
             sprite.position.z = 0.0f;
-            sprite.scale = glm::vec3(50.0f, 50.0f, 1.0f);
+            float scale = random_range(generator, 25.0f, 100.0f);
+            sprite.scale = glm::vec3(scale, scale, 1.0f);
             sprite.rotation = random_range(generator, 0.0f, 6.28f);
             sprite.texture_index = random_range(generator, 0, 9);
             angular_velocities[index] = random_range(generator, -2.0f, 2.0f);
@@ -492,32 +394,20 @@ int main() {
             });
 
         // Create color attachments
-        render_resources->create_image(vkal::ImageResourceParams{
-            .identifier = "color attachment",
-            .type = vk::ImageType::e2D,
-            .view_type = vk::ImageViewType::e2D,
-            .extent = vk::Extent3D(WINDOW_EXTENT, 1),
-            .format = vk::Format::eR8G8B8A8Srgb,
-            .sample_count = vk::SampleCountFlagBits::e1,
-            .aspects = vk::ImageAspectFlagBits::eColor,
-            .mip_levels = 1,
-            .usage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-            .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
-        });
-
-        render_resources->create_image(vkal::ImageResourceParams{
+        vkal::ImageResourceParams msaa_params = {
             .identifier = "msaa",
             .type = vk::ImageType::e2D,
             .view_type = vk::ImageViewType::e2D,
-            .extent = vk::Extent3D(WINDOW_EXTENT, 1),
-            .format = vk::Format::eR8G8B8A8Srgb,
+            .extent = vk::Extent3D(window_extent, 1),
+            .format = vk::Format::eB8G8R8A8Srgb,
             .sample_count = vk::SampleCountFlagBits::e4,
             .aspects = vk::ImageAspectFlagBits::eColor,
             .mip_levels = 1,
             .usage = vk::ImageUsageFlagBits::eColorAttachment |
                      vk::ImageUsageFlagBits::eTransientAttachment,
             .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
-        });
+        };
+        render_resources->create_image(msaa_params);
 
         // Create render graph
         vkal::RenderGraphPtr render_graph = vkal::render_graph_ptr(vkal::RenderGraphParams{
@@ -617,15 +507,6 @@ int main() {
             }
 
             image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
-                .identifier = "color attachment",
-                .barrier =
-                    vkal::ResourceBarrier{
-                        .layout = vk::ImageLayout::eColorAttachmentOptimal,
-                        .access = vk::AccessFlagBits2::eColorAttachmentWrite,
-                        .stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-                    },
-            });
-            image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
                 .identifier = "msaa",
                 .barrier =
                     vkal::ResourceBarrier{
@@ -643,21 +524,20 @@ int main() {
                 .binding = 2,
             });
 
-            std::vector<vkal::RenderAttachmentParams> render_attachments = {
-                vkal::RenderAttachmentParams{
-                    .type = vkal::RenderAttachmentType::COLOR,
-                    .identifier = "main attachment",
-                    .image = "msaa",
-                    .resolve_image = "color attachment",
-                    .resolve_mode = vk::ResolveModeFlagBits::eAverage,
-                    .clear_value = vk::ClearValue(
-                        vk::ClearColorValue(std::array<float, 4>{0.01f, 0.01f, 0.01f, 1.0f})),
-                    .load_op = vk::AttachmentLoadOp::eClear,
-                    .store_op = vk::AttachmentStoreOp::eStore,
-                },
-            };
+            std::vector<vkal::RenderAttachmentParams> render_attachments;
+            render_attachments.push_back(vkal::RenderAttachmentParams{
+                .type = vkal::RenderAttachmentType::SWAPCHAIN,
+                .identifier = "main attachment",
+                .image = "msaa",
+                .resolve_mode = vk::ResolveModeFlagBits::eAverage,
+                .clear_value = vk::ClearValue(
+                    vk::ClearColorValue(std::array<float, 4>{0.01f, 0.01f, 0.01f, 1.0f})),
+                .load_op = vk::AttachmentLoadOp::eClear,
+                .store_op = vk::AttachmentStoreOp::eStore,
+            });
 
-            std::unique_ptr<TexturePass> texture_pass_ptr = std::make_unique<TexturePass>();
+            std::unique_ptr<TexturePass> texture_pass_ptr =
+                std::make_unique<TexturePass>(window_extent);
             texture_pass = texture_pass_ptr.get();
             vkal::RenderPassParams pass_params{
                 .identifier = "texture pass",
@@ -671,98 +551,24 @@ int main() {
             render_graph->add_pass(std::move(pass_params));
         }
 
-        // Screen pass
-        ScreenPass* screen_pass;
-        {
-            std::vector<vkal::ImageResourceDescription> image_resrouces_descriptions;
-            image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
-                .identifier = "color attachment",
-                .barrier =
-                    vkal::ResourceBarrier{
-                        .layout = vk::ImageLayout::eShaderReadOnlyOptimal,
-                        .access = vk::AccessFlagBits2::eShaderSampledRead,
-                        .stage = vk::PipelineStageFlagBits2::eFragmentShader,
-                    },
-                .resource_descriptor =
-                    vkal::ResourceDescriptor{
-                        .type = vk::DescriptorType::eSampledImage,
-                        .set = 0,
-                        .binding = 0,
-                    },
-            });
-
-            std::vector<vkal::SamplerResourceDescription> sampler_resouces_description;
-            sampler_resouces_description.push_back(vkal::SamplerResourceDescription{
-                .identifier = "screen sampler",
-                .set = 0,
-                .binding = 1,
-            });
-
-            std::vector<vkal::RenderAttachmentParams> render_attachments = {
-                vkal::RenderAttachmentParams{
-                    .type = vkal::RenderAttachmentType::SWAPCHAIN,
-                    .identifier = "main attachment",
-                    .clear_value = vk::ClearValue(
-                        vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f})),
-                    .load_op = vk::AttachmentLoadOp::eClear,
-                    .store_op = vk::AttachmentStoreOp::eStore,
-                },
-            };
-
-            std::unique_ptr<ScreenPass> screen_pass_ptr = std::make_unique<ScreenPass>();
-            screen_pass = screen_pass_ptr.get();
-            vkal::RenderPassParams pass_params{
-                .identifier = "screen pass",
-                .image_resources = image_resrouces_descriptions,
-                .render_attachments = render_attachments,
-                .sampler_resources = sampler_resouces_description,
-                .pipeline = "screen pipeline",
-                .pass = std::move(screen_pass_ptr),
-            };
-            render_graph->add_pass(std::move(pass_params));
-        }
-
         render_graph->compile();
 
-        vkal_surface->set_resize_callback([&render_resources, &render_graph, &uniform,
-                                           &texture_pass, &screen_pass](vk::Extent2D extent) {
-            render_resources->create_image(vkal::ImageResourceParams{
-                .identifier = "color attachment",
-                .type = vk::ImageType::e2D,
-                .view_type = vk::ImageViewType::e2D,
-                .extent = vk::Extent3D(extent, 1),
-                .format = vk::Format::eR8G8B8A8Srgb,
-                .sample_count = vk::SampleCountFlagBits::e1,
-                .aspects = vk::ImageAspectFlagBits::eColor,
-                .mip_levels = 1,
-                .usage =
-                    vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled,
-                .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
-            });
+        vkal_surface->set_resize_callback(
+            [&render_resources, &render_graph, &uniform, &texture_pass,
+             &msaa_params](const vk::SurfaceCapabilitiesKHR& surface_capabilities) {
+                vk::Extent3D extent = vk::Extent3D(surface_capabilities.currentExtent, 1);
+                msaa_params.extent = extent;
 
-            render_resources->create_image(vkal::ImageResourceParams{
-                .identifier = "msaa",
-                .type = vk::ImageType::e2D,
-                .view_type = vk::ImageViewType::e2D,
-                .extent = vk::Extent3D(extent, 1),
-                .format = vk::Format::eR8G8B8A8Srgb,
-                .sample_count = vk::SampleCountFlagBits::e4,
-                .aspects = vk::ImageAspectFlagBits::eColor,
-                .mip_levels = 1,
-                .usage = vk::ImageUsageFlagBits::eColorAttachment |
-                         vk::ImageUsageFlagBits::eTransientAttachment,
-                .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+                render_resources->create_image(msaa_params);
+
+                render_graph->reset_swapchain_images();
+                render_graph->rebind_resources();
+                float width = static_cast<float>(extent.width);
+                float height = static_cast<float>(extent.height);
+                uniform.projection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
+                texture_pass->set_viewport_size(width, height);
+                texture_pass->set_scissor_size(vk::Extent2D(extent.width, extent.height));
             });
-            render_graph->reset_swapchain_images();
-            render_graph->rebind_resources();
-            float width = static_cast<float>(extent.width);
-            float height = static_cast<float>(extent.height);
-            uniform.projection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
-            texture_pass->set_viewport_size(width, height);
-            texture_pass->set_scissor_size(extent);
-            screen_pass->set_viewport_size(width, height);
-            screen_pass->set_scissor_size(extent);
-        });
 
         // Main loop
         float previous_time;

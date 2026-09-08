@@ -235,7 +235,7 @@ int main() {
         });
 
         // Create MSAA texture
-        vkal::ImageResourceParams mssa_params = {
+        vkal::ImageResourceParams msaa_params = {
             .identifier = "msaa",
             .type = vk::ImageType::e2D,
             .view_type = vk::ImageViewType::e2D,
@@ -248,7 +248,7 @@ int main() {
                      vk::ImageUsageFlagBits::eTransientAttachment,
             .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         };
-        render_resources->create_image(mssa_params);
+        render_resources->create_image(msaa_params);
 
         // Render graph
         vkal::RenderGraphPtr render_graph = vkal::render_graph_ptr(vkal::RenderGraphParams{
@@ -320,9 +320,11 @@ int main() {
         render_graph->compile();
 
         vkal_surface->set_resize_callback(
-            [&render_graph, &render_resources, &mssa_params](vk::Extent2D extent) {
-                mssa_params.extent = vk::Extent3D(extent, 1);
-                render_resources->create_image(mssa_params);
+            [&render_graph, &render_resources,
+             &msaa_params](const vk::SurfaceCapabilitiesKHR& surface_capabilities) {
+                vk::Extent3D extent = vk::Extent3D(surface_capabilities.currentExtent, 1);
+                msaa_params.extent = extent;
+                render_resources->create_image(msaa_params);
                 render_graph->reset_swapchain_images();
                 render_graph->rebind_resources();
             });
