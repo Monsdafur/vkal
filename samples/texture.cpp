@@ -17,9 +17,22 @@
 
 #include <exception>
 #include <print>
+#include <random>
+#include <ranges>
 #include <stdexcept>
 
 constexpr vk::Extent2D WINDOW_EXTENT = vk::Extent2D(1200, 600);
+constexpr uint32_t SPRITE_COUNT = 1600;
+
+float random_range(std::mt19937& generator, float min, float max) {
+    std::uniform_real_distribution<float> distribution(min, max);
+    return distribution(generator);
+}
+
+float random_range(std::mt19937& generator, int32_t min, int32_t max) {
+    std::uniform_int_distribution<int32_t> distribution(min, max);
+    return distribution(generator);
+}
 
 struct Vertex {
     glm::vec3 position;
@@ -27,11 +40,45 @@ struct Vertex {
 };
 
 struct Uniform {
-    glm::mat4 translation;
-    glm::mat4 rotation;
-    glm::mat4 scale;
     glm::mat4 projection;
     glm::mat4 view;
+};
+
+struct Sprite {
+    glm::vec3 position;
+    uint32_t pad0;
+    glm::vec3 scale;
+    uint32_t pad1;
+    float rotation;
+    uint32_t texture_index;
+    uint32_t pad2[2];
+};
+
+class CopyPass : public vkal::RenderPass {
+  public:
+    virtual void setup_metadata(
+        const std::unordered_map<std::string, std::reference_wrapper<vkal::Buffer>>& buffers,
+        const std::unordered_map<std::string, std::reference_wrapper<vkal::Image>>& images,
+        std::optional<std::reference_wrapper<vkal::Pipeline>> pipeline_opt,
+        std::optional<std::reference_wrapper<vkal::DescriptorSet>> descriptor_sets_opt) override {
+        this->sprite_staging_buffer = &buffers.at("staging sprite buffer").get();
+        this->sprite_buffer = &buffers.at("sprite buffer").get();
+    }
+
+    virtual void render(vk::CommandBuffer command) override {
+        vk::BufferCopy2 region;
+        region.setSrcOffset(0).setSrcOffset(0).setSize(sprite_buffer->get_size());
+        vk::CopyBufferInfo2 copy_info;
+        copy_info.setSrcBuffer(this->sprite_staging_buffer->get())
+            .setDstBuffer(this->sprite_buffer->get())
+            .setRegions(region);
+
+        command.copyBuffer2(copy_info);
+    }
+
+  private:
+    vkal::Buffer* sprite_staging_buffer;
+    vkal::Buffer* sprite_buffer;
 };
 
 class ScreenPass : public vkal::RenderPass {
@@ -130,7 +177,7 @@ class TexturePass : public vkal::RenderPass {
         command.bindVertexBuffers2(0, vertex_buffer->get(), {0});
         command.bindIndexBuffer2(index_buffer->get(), 0, index_buffer->get_size(),
                                  vk::IndexType::eUint32);
-        command.drawIndexed(6, 1, 0, 0, 0);
+        command.drawIndexed(6, SPRITE_COUNT, 0, 0, 0);
     }
 
     void set_viewport_size(float width, float height) {
@@ -153,6 +200,9 @@ class TexturePass : public vkal::RenderPass {
 
 int main() {
     try {
+        std::random_device random_device;
+        std::mt19937 generator(random_device());
+
         // Create Window
         if (!SDL_Init(SDL_INIT_VIDEO)) {
             throw std::runtime_error(SDL_GetError());
@@ -201,14 +251,14 @@ int main() {
         vkal::MemoryAllocatorPtr memory_allocator =
             vkal::memory_allocator_ptr(vkal::MemoryAllocatorParams{
                 .vkal_device = *vkal_device,
-                .block_size = vkal::megabytes(128),
+                .block_size = vkal::megabytes(32),
             });
 
         // Craete descriptor
         vkal::DescriptorPtr vkal_descriptor = vkal::descriptor_ptr(vkal::DescriptorParams{
             .vkal_device = *vkal_device,
-            .max_sets = 10,
-            .pool_size = 10,
+            .max_sets = 100,
+            .pool_size = 100,
         });
 
         // Create graphics resource manager
@@ -225,9 +275,11 @@ int main() {
                 {
                     vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
                                                    vk::ShaderStageFlagBits::eVertex),
-                    vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eSampledImage, 1,
-                                                   vk::ShaderStageFlagBits::eFragment),
+                    vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer, 1,
+                                                   vk::ShaderStageFlagBits::eVertex),
                     vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eSampler, 1,
+                                                   vk::ShaderStageFlagBits::eFragment),
+                    vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eSampledImage, 10,
                                                    vk::ShaderStageFlagBits::eFragment),
                 },
             .binding_flags =
@@ -235,6 +287,8 @@ int main() {
                     vk::DescriptorBindingFlags(),
                     vk::DescriptorBindingFlags(),
                     vk::DescriptorBindingFlags(),
+                    vk::DescriptorBindingFlagBits::eVariableDescriptorCount |
+                        vk::DescriptorBindingFlagBits::ePartiallyBound,
                 },
         });
 
@@ -316,10 +370,20 @@ int main() {
         });
 
         // Load images
-        load_images(queue, command, *vkal_device, *render_resources,
-                    {
-                        "resources/textures/256x256/Bricks/Bricks_01-256x256.png",
-                    });
+        std::map<std::string, std::reference_wrapper<vkal::Image>> image_map =
+            load_images(queue, command, *vkal_device, *render_resources,
+                        {
+                            "resources/textures/256x256/Bricks/Bricks_01-256x256.png",
+                            "resources/textures/256x256/Bricks/Bricks_02-256x256.png",
+                            "resources/textures/256x256/Bricks/Bricks_03-256x256.png",
+                            "resources/textures/256x256/Bricks/Bricks_04-256x256.png",
+                            "resources/textures/256x256/Bricks/Bricks_05-256x256.png",
+                            "resources/textures/256x256/Bricks/Bricks_06-256x256.png",
+                            "resources/textures/256x256/Bricks/Bricks_07-256x256.png",
+                            "resources/textures/256x256/Bricks/Bricks_08-256x256.png",
+                            "resources/textures/256x256/Bricks/Bricks_09-256x256.png",
+                            "resources/textures/256x256/Bricks/Bricks_10-256x256.png",
+                        });
 
         render_resources->create_sampler(vkal::SamplerResourceParams{
             .identifier = "basic sampler",
@@ -371,8 +435,20 @@ int main() {
             uniform.projection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
             uniform.view = glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f),
                                        glm::vec3(0.0f, 1.0f, 0.0f));
-            uniform.translation =
-                glm::translate(glm::mat4(1.0f), glm::vec3(width, height, 0.0f) * 0.5f);
+        }
+
+        std::array<Sprite, SPRITE_COUNT> sprites;
+        std::array<float, SPRITE_COUNT> angular_velocities;
+        for (const auto& [index, sprite] : std::ranges::views::enumerate(sprites)) {
+            sprite.position.x =
+                random_range(generator, 50.0f, static_cast<float>(WINDOW_EXTENT.width) - 50.0f);
+            sprite.position.y =
+                random_range(generator, 50.0f, static_cast<float>(WINDOW_EXTENT.height) - 50.0f);
+            sprite.position.z = 0.0f;
+            sprite.scale = glm::vec3(50.0f, 50.0f, 1.0f);
+            sprite.rotation = random_range(generator, 0.0f, 6.28f);
+            sprite.texture_index = random_range(generator, 0, 9);
+            angular_velocities[index] = random_range(generator, -2.0f, 2.0f);
         }
 
         // Create vertex buffer
@@ -395,6 +471,25 @@ int main() {
             .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible |
                                  vk::MemoryPropertyFlagBits::eHostCoherent,
         });
+
+        // Create sprite device local buffer
+        render_resources->create_buffer(vkal::BufferResourceParams{
+            .identifier = "sprite buffer",
+            .size = sizeof(Sprite) * sprites.size(),
+            .usage =
+                vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
+            .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+        });
+
+        // Create sprite host buffer
+        vkal::Buffer& staging_sprite_buffer =
+            render_resources->create_buffer(vkal::BufferResourceParams{
+                .identifier = "staging sprite buffer",
+                .size = sizeof(Sprite) * sprites.size(),
+                .usage = vk::BufferUsageFlagBits::eTransferSrc,
+                .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible |
+                                     vk::MemoryPropertyFlagBits::eHostCoherent,
+            });
 
         // Create color attachments
         render_resources->create_image(vkal::ImageResourceParams{
@@ -432,6 +527,34 @@ int main() {
             .vkal_descriptor = *vkal_descriptor,
         });
 
+        // Copy pass
+        {
+            std::vector<vkal::BufferResourceDescription> buffer_resrouces_descriptions;
+            buffer_resrouces_descriptions.push_back(vkal::BufferResourceDescription{
+                .identifier = "staging sprite buffer",
+                .barrier =
+                    vkal::ResourceBarrier{
+                        .access = vk::AccessFlagBits2::eTransferRead,
+                        .stage = vk::PipelineStageFlagBits2::eTransfer,
+                    },
+            });
+            buffer_resrouces_descriptions.push_back(vkal::BufferResourceDescription{
+                .identifier = "sprite buffer",
+                .barrier =
+                    vkal::ResourceBarrier{
+                        .access = vk::AccessFlagBits2::eTransferWrite,
+                        .stage = vk::PipelineStageFlagBits2::eTransfer,
+                    },
+            });
+
+            vkal::RenderPassParams pass_params{
+                .identifier = "copy pass",
+                .buffer_resources = buffer_resrouces_descriptions,
+                .pass = std::make_unique<CopyPass>(),
+            };
+            render_graph->add_pass(std::move(pass_params));
+        }
+
         // Texture pass
         TexturePass* texture_pass;
         {
@@ -456,23 +579,43 @@ int main() {
                         .binding = 0,
                     },
             });
-
-            std::vector<vkal::ImageResourceDescription> image_resrouces_descriptions;
-            image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
-                .identifier = "Bricks_01-256x256",
+            buffer_resrouces_descriptions.push_back(vkal::BufferResourceDescription{
+                .identifier = "sprite buffer",
                 .barrier =
                     vkal::ResourceBarrier{
-                        .layout = vk::ImageLayout::eShaderReadOnlyOptimal,
-                        .access = vk::AccessFlagBits2::eShaderSampledRead,
-                        .stage = vk::PipelineStageFlagBits2::eFragmentShader,
+                        .access = vk::AccessFlagBits2::eShaderRead,
+                        .stage = vk::PipelineStageFlagBits2::eVertexShader,
                     },
                 .resource_descriptor =
                     vkal::ResourceDescriptor{
-                        .type = vk::DescriptorType::eSampledImage,
+                        .type = vk::DescriptorType::eStorageBuffer,
                         .set = 0,
                         .binding = 1,
                     },
             });
+
+            std::vector<vkal::ImageResourceDescription> image_resrouces_descriptions;
+            size_t index = 0;
+            for (const auto& entry : image_map) {
+                image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
+                    .identifier = entry.first,
+                    .barrier =
+                        vkal::ResourceBarrier{
+                            .layout = vk::ImageLayout::eShaderReadOnlyOptimal,
+                            .access = vk::AccessFlagBits2::eShaderSampledRead,
+                            .stage = vk::PipelineStageFlagBits2::eFragmentShader,
+                        },
+                    .resource_descriptor =
+                        vkal::ResourceDescriptor{
+                            .type = vk::DescriptorType::eSampledImage,
+                            .set = 0,
+                            .binding = 3,
+                            .array_index = static_cast<uint32_t>(index),
+                        },
+                });
+                index++;
+            }
+
             image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
                 .identifier = "color attachment",
                 .barrier =
@@ -502,6 +645,7 @@ int main() {
 
             std::vector<vkal::RenderAttachmentParams> render_attachments = {
                 vkal::RenderAttachmentParams{
+                    .type = vkal::RenderAttachmentType::COLOR,
                     .identifier = "main attachment",
                     .image = "msaa",
                     .resolve_image = "color attachment",
@@ -554,12 +698,23 @@ int main() {
                 .binding = 1,
             });
 
+            std::vector<vkal::RenderAttachmentParams> render_attachments = {
+                vkal::RenderAttachmentParams{
+                    .type = vkal::RenderAttachmentType::SWAPCHAIN,
+                    .identifier = "main attachment",
+                    .clear_value = vk::ClearValue(
+                        vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f})),
+                    .load_op = vk::AttachmentLoadOp::eClear,
+                    .store_op = vk::AttachmentStoreOp::eStore,
+                },
+            };
+
             std::unique_ptr<ScreenPass> screen_pass_ptr = std::make_unique<ScreenPass>();
             screen_pass = screen_pass_ptr.get();
             vkal::RenderPassParams pass_params{
                 .identifier = "screen pass",
-                .is_root = true,
                 .image_resources = image_resrouces_descriptions,
+                .render_attachments = render_attachments,
                 .sampler_resources = sampler_resouces_description,
                 .pipeline = "screen pipeline",
                 .pass = std::move(screen_pass_ptr),
@@ -603,8 +758,6 @@ int main() {
             float width = static_cast<float>(extent.width);
             float height = static_cast<float>(extent.height);
             uniform.projection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
-            uniform.translation =
-                glm::translate(glm::mat4(1.0f), glm::vec3(width, height, 0.0f) * 0.5f);
             texture_pass->set_viewport_size(width, height);
             texture_pass->set_scissor_size(extent);
             screen_pass->set_viewport_size(width, height);
@@ -612,6 +765,8 @@ int main() {
         });
 
         // Main loop
+        float previous_time;
+        float delta_time;
         SDL_Event event;
         bool running = true;
         while (running) {
@@ -627,10 +782,15 @@ int main() {
                 }
             }
 
-            float t = SDL_GetTicks() / 1000.0f;
-            uniform.rotation = glm::rotate(glm::mat4(1.0f), t, glm::vec3(0.0f, 0.0f, 1.0f));
-            uniform.scale = glm::scale(glm::mat4(1.0f), glm::vec3(256.0f, 256.0f, 1.0f));
+            float current_time = SDL_GetTicks() / 1000.0f;
+            delta_time = current_time - previous_time;
+            previous_time = current_time;
+
             uniform_buffer.upload(&uniform, sizeof(Uniform));
+            staging_sprite_buffer.upload(sprites.data(), sizeof(Sprite) * sprites.size());
+            for (const auto& [index, sprite] : std::ranges::views::enumerate(sprites)) {
+                sprite.rotation += angular_velocities[index] * delta_time;
+            }
 
             render_graph->sync();
             std::optional<uint32_t> swapchain_index_opt =
