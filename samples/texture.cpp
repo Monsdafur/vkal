@@ -9,6 +9,7 @@
 #include "../vkal/src/render_resources.hpp"
 #include "../vkal/src/surface.hpp"
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "vkal-helper/utilities.hpp"
 
 #include <SDL3/SDL.h>
@@ -21,7 +22,8 @@
 #include <ranges>
 #include <stdexcept>
 
-constexpr uint32_t SPRITE_COUNT = 1000;
+constexpr uint32_t OBJECT_COUNT = 4000;
+constexpr float PI = std::numbers::pi;
 
 float random_range(std::mt19937& generator, float min, float max) {
     std::uniform_real_distribution<float> distribution(min, max);
@@ -35,49 +37,24 @@ float random_range(std::mt19937& generator, int32_t min, int32_t max) {
 
 struct Vertex {
     glm::vec3 position;
+    glm::vec3 normal;
     glm::vec2 uv;
 };
 
 struct Uniform {
     glm::mat4 projection;
     glm::mat4 view;
+    glm::vec3 light_direction;
+    float diffuse;
+    float ambient;
+    uint32_t pad1[2];
 };
 
-struct Sprite {
-    glm::vec3 position;
-    uint32_t pad0;
-    glm::vec3 scale;
-    uint32_t pad1;
-    float rotation;
+struct Object {
+    glm::mat4 model;
+    glm::mat4 inv_model;
     uint32_t texture_index;
-    uint32_t pad2[2];
-};
-
-class CopyPass : public vkal::RenderPass {
-  public:
-    virtual void setup_metadata(
-        const std::unordered_map<std::string, std::reference_wrapper<vkal::Buffer>>& buffers,
-        const std::unordered_map<std::string, std::reference_wrapper<vkal::Image>>& images,
-        std::optional<std::reference_wrapper<vkal::Pipeline>> pipeline_opt,
-        std::optional<std::reference_wrapper<vkal::DescriptorSet>> descriptor_sets_opt) override {
-        this->sprite_staging_buffer = &buffers.at("staging sprite buffer").get();
-        this->sprite_buffer = &buffers.at("sprite buffer").get();
-    }
-
-    virtual void render(vk::CommandBuffer command) override {
-        vk::BufferCopy2 region;
-        region.setSrcOffset(0).setSrcOffset(0).setSize(sprite_buffer->get_size());
-        vk::CopyBufferInfo2 copy_info;
-        copy_info.setSrcBuffer(this->sprite_staging_buffer->get())
-            .setDstBuffer(this->sprite_buffer->get())
-            .setRegions(region);
-
-        command.copyBuffer2(copy_info);
-    }
-
-  private:
-    vkal::Buffer* sprite_staging_buffer;
-    vkal::Buffer* sprite_buffer;
+    uint32_t pad[3];
 };
 
 class TexturePass : public vkal::RenderPass {
@@ -121,7 +98,7 @@ class TexturePass : public vkal::RenderPass {
         command.bindVertexBuffers2(0, vertex_buffer->get(), {0});
         command.bindIndexBuffer2(index_buffer->get(), 0, index_buffer->get_size(),
                                  vk::IndexType::eUint32);
-        command.drawIndexed(6, SPRITE_COUNT, 0, 0, 0);
+        command.drawIndexed(36, OBJECT_COUNT, 0, 0, 0);
     }
 
     void set_viewport_size(float width, float height) {
@@ -152,8 +129,7 @@ int main() {
             throw std::runtime_error(SDL_GetError());
         }
 
-        SDL_Window* window =
-            SDL_CreateWindow("Texture", 1920, 1080, SDL_WINDOW_VULKAN | SDL_WINDOW_FULLSCREEN);
+        SDL_Window* window = SDL_CreateWindow("Texture", 800, 600, SDL_WINDOW_VULKAN);
         if (!window) {
             throw std::runtime_error(SDL_GetError());
         }
@@ -174,6 +150,12 @@ int main() {
         });
         vk::Queue queue = vkal_device->get_queue(queue_index);
         vk::CommandBuffer command = vkal_command->get(0);
+        const std::vector<vk::Format>& depth_formats =
+            vkal_device->get_supported_depth_formats(vk::ImageTiling::eOptimal);
+        auto depth_it = std::ranges::find_if(
+            depth_formats, [](vk::Format format) { return format == vk::Format::eD32Sfloat; });
+        vk::Format depth_format =
+            depth_it != depth_formats.end() ? *depth_it : depth_formats.front();
 
         // Create surface
         vkal::SurfacePtr vkal_surface = vkal::surface_ptr(vkal::SurfaceParams{
@@ -185,8 +167,8 @@ int main() {
                 vk::SurfaceFormatKHR(vk::Format::eB8G8R8A8Srgb, vk::ColorSpaceKHR::eSrgbNonlinear),
             .present_modes =
                 {
-                    vk::PresentModeKHR::eFifo,
                     vk::PresentModeKHR::eImmediate,
+                    vk::PresentModeKHR::eFifo,
                     vk::PresentModeKHR::eMailbox,
                 },
         });
@@ -259,6 +241,7 @@ int main() {
                     },
                 },
             .color_attachment_formats = {vk::Format::eB8G8R8A8Srgb},
+            .depth_format = depth_format,
             .rasterization_sample_count = vk::SampleCountFlagBits::e4,
             .vertex_input_rate = vk::VertexInputRate::eVertex,
             .vertex_stride = sizeof(Vertex),
@@ -266,10 +249,17 @@ int main() {
                 {
                     vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat,
                                                         offsetof(Vertex, position)),
-                    vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32Sfloat,
+                    vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat,
+                                                        offsetof(Vertex, normal)),
+                    vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32Sfloat,
                                                         offsetof(Vertex, uv)),
                 },
             .topology = vk::PrimitiveTopology::eTriangleList,
+            .front_face = vk::FrontFace::eCounterClockwise,
+            .cull_mode = vk::CullModeFlagBits::eBack,
+            .polygon_mode = vk::PolygonMode::eFill,
+            .enable_depth_test = true,
+            .enable_depth_write = true,
         });
 
         // Load images
@@ -299,58 +289,228 @@ int main() {
             .max_anisotropy = 4.0f,
         });
 
-        render_resources->create_sampler(vkal::SamplerResourceParams{
-            .identifier = "screen sampler",
-            .address_mode = vk::SamplerAddressMode::eClampToBorder,
-            .filter = vk::Filter::eNearest,
-            .min_lod = 0.0f,
-            .max_lod = 1.0f,
-            .mip_map_mode = vk::SamplerMipmapMode::eNearest,
-            .enable_anisotropy = false,
-        });
-
         // Initializing resources
-        std::array<Vertex, 4> vertices = {
+        std::array<Vertex, 24> vertices = {
+            // Z-
             Vertex{
-                .position = glm::vec3(0.5f, 0.5f, 0.0f),
+                .position = glm::vec3(0.5f, 0.5f, -0.5f),
+                .normal = glm::vec3(0.0f, 0.0f, -1.0f),
                 .uv = glm::vec2(1.0f, 1.0f),
             },
             Vertex{
-                .position = glm::vec3(-0.5f, 0.5f, 0.0f),
+                .position = glm::vec3(-0.5f, 0.5f, -0.5f),
+                .normal = glm::vec3(0.0f, 0.0f, -1.0f),
                 .uv = glm::vec2(0.0f, 1.0f),
             },
             Vertex{
-                .position = glm::vec3(-0.5f, -0.5f, 0.0f),
+                .position = glm::vec3(-0.5f, -0.5f, -0.5f),
+                .normal = glm::vec3(0.0f, 0.0f, -1.0f),
                 .uv = glm::vec2(0.0f, 0.0f),
             },
             Vertex{
-                .position = glm::vec3(0.5f, -0.5f, 0.0f),
+                .position = glm::vec3(0.5f, -0.5f, -0.5f),
+                .normal = glm::vec3(0.0f, 0.0f, -1.0f),
                 .uv = glm::vec2(1.0f, 0.0f),
+            },
+
+            // Z+
+            Vertex{
+                .position = glm::vec3(-0.5f, 0.5f, 0.5f),
+                .normal = glm::vec3(0.0f, 0.0f, 1.0f),
+                .uv = glm::vec2(0.0f, 1.0f),
+            },
+            Vertex{
+                .position = glm::vec3(0.5f, 0.5f, 0.5f),
+                .normal = glm::vec3(0.0f, 0.0f, 1.0f),
+                .uv = glm::vec2(1.0f, 1.0f),
+            },
+            Vertex{
+                .position = glm::vec3(0.5f, -0.5f, 0.5f),
+                .normal = glm::vec3(0.0f, 0.0f, 1.0f),
+                .uv = glm::vec2(1.0f, 0.0f),
+            },
+            Vertex{
+                .position = glm::vec3(-0.5f, -0.5f, 0.5f),
+                .normal = glm::vec3(0.0f, 0.0f, 1.0f),
+                .uv = glm::vec2(0.0f, 0.0f),
+            },
+
+            // X-
+            Vertex{
+                .position = glm::vec3(-0.5f, 0.5f, -0.5f),
+                .normal = glm::vec3(-1.0f, 0.0f, 0.0f),
+                .uv = glm::vec2(1.0f, 1.0f),
+            },
+            Vertex{
+                .position = glm::vec3(-0.5f, 0.5f, 0.5f),
+                .normal = glm::vec3(-1.0f, 0.0f, 0.0f),
+                .uv = glm::vec2(0.0f, 1.0f),
+            },
+            Vertex{
+                .position = glm::vec3(-0.5f, -0.5f, 0.5f),
+                .normal = glm::vec3(-1.0f, 0.0f, 0.0f),
+                .uv = glm::vec2(0.0f, 0.0f),
+            },
+            Vertex{
+                .position = glm::vec3(-0.5f, -0.5f, -0.5f),
+                .normal = glm::vec3(-1.0f, 0.0f, 0.0f),
+                .uv = glm::vec2(1.0f, 0.0f),
+            },
+
+            // X+
+            Vertex{
+                .position = glm::vec3(0.5f, 0.5f, 0.5f),
+                .normal = glm::vec3(1.0f, 0.0f, 0.0f),
+                .uv = glm::vec2(1.0f, 1.0f),
+            },
+            Vertex{
+                .position = glm::vec3(0.5f, 0.5f, -0.5f),
+                .normal = glm::vec3(1.0f, 0.0f, 0.0f),
+                .uv = glm::vec2(0.0f, 1.0f),
+            },
+            Vertex{
+                .position = glm::vec3(0.5f, -0.5f, -0.5f),
+                .normal = glm::vec3(1.0f, 0.0f, 0.0f),
+                .uv = glm::vec2(0.0f, 0.0f),
+            },
+            Vertex{
+                .position = glm::vec3(0.5f, -0.5f, 0.5f),
+                .normal = glm::vec3(1.0f, 0.0f, 0.0f),
+                .uv = glm::vec2(1.0f, 0.0f),
+            },
+
+            // Y-
+            Vertex{
+                .position = glm::vec3(-0.5f, -0.5f, -0.5f),
+                .normal = glm::vec3(0.0f, -1.0f, 0.0f),
+                .uv = glm::vec2(0.0f, 1.0f),
+            },
+            Vertex{
+                .position = glm::vec3(-0.5f, -0.5f, 0.5f),
+                .normal = glm::vec3(0.0f, -1.0f, 0.0f),
+                .uv = glm::vec2(0.0f, 0.0f),
+            },
+            Vertex{
+                .position = glm::vec3(0.5f, -0.5f, 0.5f),
+                .normal = glm::vec3(0.0f, -1.0f, 0.0f),
+                .uv = glm::vec2(1.0f, 0.0f),
+            },
+            Vertex{
+                .position = glm::vec3(0.5f, -0.5f, -0.5f),
+                .normal = glm::vec3(0.0f, -1.0f, 0.0f),
+                .uv = glm::vec2(1.0f, 1.0f),
+            },
+
+            // Y+
+            Vertex{
+                .position = glm::vec3(-0.5f, 0.5f, 0.5f),
+                .normal = glm::vec3(0.0f, 1.0f, 0.0f),
+                .uv = glm::vec2(0.0f, 1.0f),
+            },
+            Vertex{
+                .position = glm::vec3(-0.5f, 0.5f, -0.5f),
+                .normal = glm::vec3(0.0f, 1.0f, 0.0f),
+                .uv = glm::vec2(0.0f, 0.0f),
+            },
+            Vertex{
+                .position = glm::vec3(0.5f, 0.5f, -0.5f),
+                .normal = glm::vec3(0.0f, 1.0f, 0.0f),
+                .uv = glm::vec2(1.0f, 0.0f),
+            },
+            Vertex{
+                .position = glm::vec3(0.5f, 0.5f, 0.5f),
+                .normal = glm::vec3(0.0f, 1.0f, 0.0f),
+                .uv = glm::vec2(1.0f, 1.0f),
             },
         };
 
-        std::array<uint32_t, 6> indices = {0, 1, 2, 0, 2, 3};
+        std::array<uint32_t, 36> indices = {
+            // Z-
+            0,
+            1,
+            2,
+            0,
+            2,
+            3,
+
+            // Z+
+            4,
+            5,
+            6,
+            4,
+            6,
+            7,
+
+            // X-
+            8,
+            9,
+            10,
+            8,
+            10,
+            11,
+
+            // X+
+            12,
+            13,
+            14,
+            12,
+            14,
+            15,
+
+            // Y-
+            16,
+            17,
+            18,
+            16,
+            18,
+            19,
+
+            // Y+
+            20,
+            21,
+            22,
+            20,
+            22,
+            23,
+        };
 
         Uniform uniform;
         {
-            float width = static_cast<float>(window_extent.width);
-            float height = static_cast<float>(window_extent.height);
-            uniform.projection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
+            float fwidth = static_cast<float>(window_extent.width);
+            float fheight = static_cast<float>(window_extent.height);
+            uniform.projection =
+                glm::perspective(glm::radians(80.0f), fwidth / fheight, 0.1f, 100.0f);
             uniform.view = glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f),
                                        glm::vec3(0.0f, 1.0f, 0.0f));
+            uniform.light_direction = glm::vec3(0.5f, -1.0f, 0.25f);
+            uniform.light_direction = glm::normalize(uniform.light_direction);
+            uniform.diffuse = 0.4f;
+            uniform.ambient = 0.07f;
         }
 
-        std::array<Sprite, SPRITE_COUNT> sprites;
-        std::array<float, SPRITE_COUNT> angular_velocities;
-        for (const auto& [index, sprite] : std::ranges::views::enumerate(sprites)) {
-            sprite.position.x = random_range(generator, 0.0f, 1920.0f);
-            sprite.position.y = random_range(generator, 0.0f, 1080.0f);
-            sprite.position.z = 0.0f;
-            float scale = random_range(generator, 25.0f, 100.0f);
-            sprite.scale = glm::vec3(scale, scale, 1.0f);
-            sprite.rotation = random_range(generator, 0.0f, 6.28f);
-            sprite.texture_index = random_range(generator, 0, 9);
-            angular_velocities[index] = random_range(generator, -2.0f, 2.0f);
+        std::array<Object, OBJECT_COUNT> objects;
+        for (const auto& [index, object] : std::ranges::views::enumerate(objects)) {
+            glm::vec3 position;
+            position.x = random_range(generator, -50.0f, 50.0f);
+            position.y = random_range(generator, -50.0f, 50.0f);
+            position.z = random_range(generator, -50.0f, 50.0f);
+
+            float scale_factor = random_range(generator, 1.0f, 2.0f);
+            glm::vec3 scale = glm::vec3(scale_factor);
+
+            glm::vec3 axis;
+            axis.x = random_range(generator, -1.0f, 1.0f);
+            axis.y = random_range(generator, -1.0f, 1.0f);
+            axis.z = random_range(generator, -1.0f, 1.0f);
+            axis = glm::normalize(axis);
+
+            float angle = random_range(generator, 0.0f, PI * 2.0f);
+
+            object.model = glm::translate(glm::mat4(1.0f), position);
+            object.model = glm::rotate(object.model, angle, axis);
+            object.model = glm::scale(object.model, scale);
+            object.inv_model = glm::inverse(object.model);
+            object.texture_index = random_range(generator, 0, 9);
         }
 
         // Create vertex buffer
@@ -365,6 +525,12 @@ int main() {
                                 vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlags(),
                                 indices.data());
 
+        // Create object buffer
+        add_device_local_buffer(queue, command, *vkal_device, *render_resources, "object buffer",
+                                sizeof(Object) * objects.size(),
+                                vk::BufferUsageFlagBits::eStorageBuffer, vk::MemoryPropertyFlags(),
+                                objects.data());
+
         // Create uniform buffer
         vkal::Buffer& uniform_buffer = render_resources->create_buffer(vkal::BufferResourceParams{
             .identifier = "uniform buffer",
@@ -373,25 +539,6 @@ int main() {
             .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible |
                                  vk::MemoryPropertyFlagBits::eHostCoherent,
         });
-
-        // Create sprite device local buffer
-        render_resources->create_buffer(vkal::BufferResourceParams{
-            .identifier = "sprite buffer",
-            .size = sizeof(Sprite) * sprites.size(),
-            .usage =
-                vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer,
-            .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
-        });
-
-        // Create sprite host buffer
-        vkal::Buffer& staging_sprite_buffer =
-            render_resources->create_buffer(vkal::BufferResourceParams{
-                .identifier = "staging sprite buffer",
-                .size = sizeof(Sprite) * sprites.size(),
-                .usage = vk::BufferUsageFlagBits::eTransferSrc,
-                .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible |
-                                     vk::MemoryPropertyFlagBits::eHostCoherent,
-            });
 
         // Create color attachments
         vkal::ImageResourceParams msaa_params = {
@@ -409,6 +556,28 @@ int main() {
         };
         render_resources->create_image(msaa_params);
 
+        // Create depth attachments
+        vk::ImageAspectFlags depth_aspect = vk::ImageAspectFlagBits::eDepth;
+        if (depth_format == vk::Format::eD16UnormS8Uint ||
+            depth_format == vk::Format::eD24UnormS8Uint ||
+            depth_format == vk::Format::eD32SfloatS8Uint) {
+            depth_aspect |= vk::ImageAspectFlagBits::eStencil;
+        }
+        vkal::ImageResourceParams depth_params = {
+            .identifier = "depth",
+            .type = vk::ImageType::e2D,
+            .view_type = vk::ImageViewType::e2D,
+            .extent = vk::Extent3D(window_extent, 1),
+            .format = depth_format,
+            .sample_count = vk::SampleCountFlagBits::e4,
+            .aspects = depth_aspect,
+            .mip_levels = 1,
+            .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment |
+                     vk::ImageUsageFlagBits::eTransientAttachment,
+            .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+        };
+        render_resources->create_image(depth_params);
+
         // Create render graph
         vkal::RenderGraphPtr render_graph = vkal::render_graph_ptr(vkal::RenderGraphParams{
             .vkal_device = *vkal_device,
@@ -416,34 +585,6 @@ int main() {
             .render_resources = *render_resources,
             .vkal_descriptor = *vkal_descriptor,
         });
-
-        // Copy pass
-        {
-            std::vector<vkal::BufferResourceDescription> buffer_resrouces_descriptions;
-            buffer_resrouces_descriptions.push_back(vkal::BufferResourceDescription{
-                .identifier = "staging sprite buffer",
-                .barrier =
-                    vkal::ResourceBarrier{
-                        .access = vk::AccessFlagBits2::eTransferRead,
-                        .stage = vk::PipelineStageFlagBits2::eTransfer,
-                    },
-            });
-            buffer_resrouces_descriptions.push_back(vkal::BufferResourceDescription{
-                .identifier = "sprite buffer",
-                .barrier =
-                    vkal::ResourceBarrier{
-                        .access = vk::AccessFlagBits2::eTransferWrite,
-                        .stage = vk::PipelineStageFlagBits2::eTransfer,
-                    },
-            });
-
-            vkal::RenderPassParams pass_params{
-                .identifier = "copy pass",
-                .buffer_resources = buffer_resrouces_descriptions,
-                .pass = std::make_unique<CopyPass>(),
-            };
-            render_graph->add_pass(std::move(pass_params));
-        }
 
         // Texture pass
         TexturePass* texture_pass;
@@ -470,7 +611,7 @@ int main() {
                     },
             });
             buffer_resrouces_descriptions.push_back(vkal::BufferResourceDescription{
-                .identifier = "sprite buffer",
+                .identifier = "object buffer",
                 .barrier =
                     vkal::ResourceBarrier{
                         .access = vk::AccessFlagBits2::eShaderRead,
@@ -505,7 +646,6 @@ int main() {
                 });
                 index++;
             }
-
             image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
                 .identifier = "msaa",
                 .barrier =
@@ -514,6 +654,18 @@ int main() {
                         .layout = vk::ImageLayout::eColorAttachmentOptimal,
                         .access = vk::AccessFlagBits2::eColorAttachmentWrite,
                         .stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                    },
+            });
+            image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
+                .identifier = "depth",
+                .barrier =
+                    vkal::ResourceBarrier{
+                        .preserve = false,
+                        .layout = vk::ImageLayout::eDepthAttachmentOptimal,
+                        .access = vk::AccessFlagBits2::eDepthStencilAttachmentRead |
+                                  vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+                        .stage = vk::PipelineStageFlagBits2::eEarlyFragmentTests |
+                                 vk::PipelineStageFlagBits2::eLateFragmentTests,
                     },
             });
 
@@ -535,6 +687,14 @@ int main() {
                 .load_op = vk::AttachmentLoadOp::eClear,
                 .store_op = vk::AttachmentStoreOp::eStore,
             });
+            render_attachments.push_back(vkal::RenderAttachmentParams{
+                .type = vkal::RenderAttachmentType::DEPTH,
+                .identifier = "depth attachment",
+                .image = "depth",
+                .clear_value = vk::ClearValue(vk::ClearDepthStencilValue(1.0f, 0)),
+                .load_op = vk::AttachmentLoadOp::eClear,
+                .store_op = vk::AttachmentStoreOp::eDontCare,
+            });
 
             std::unique_ptr<TexturePass> texture_pass_ptr =
                 std::make_unique<TexturePass>(window_extent);
@@ -554,19 +714,23 @@ int main() {
         render_graph->compile();
 
         vkal_surface->set_resize_callback(
-            [&render_resources, &render_graph, &uniform, &texture_pass,
-             &msaa_params](const vk::SurfaceCapabilitiesKHR& surface_capabilities) {
+            [&render_resources, &render_graph, &uniform, &texture_pass, &msaa_params,
+             &depth_params](const vk::SurfaceCapabilitiesKHR& surface_capabilities) {
                 vk::Extent3D extent = vk::Extent3D(surface_capabilities.currentExtent, 1);
                 msaa_params.extent = extent;
+                depth_params.extent = extent;
 
                 render_resources->create_image(msaa_params);
+                render_resources->create_image(depth_params);
 
                 render_graph->reset_swapchain_images();
                 render_graph->rebind_resources();
-                float width = static_cast<float>(extent.width);
-                float height = static_cast<float>(extent.height);
-                uniform.projection = glm::ortho(0.0f, width, 0.0f, height, -1.0f, 1.0f);
-                texture_pass->set_viewport_size(width, height);
+
+                float fwidth = static_cast<float>(extent.width);
+                float fheight = static_cast<float>(extent.height);
+                uniform.projection = glm::perspective(PI / 3.0f, fwidth / fheight, 0.1f, 100.0f);
+
+                texture_pass->set_viewport_size(fwidth, fheight);
                 texture_pass->set_scissor_size(vk::Extent2D(extent.width, extent.height));
             });
 
@@ -575,6 +739,8 @@ int main() {
         float delta_time;
         SDL_Event event;
         bool running = true;
+        glm::vec3 camera_position(0.0f);
+        float speed_scale = 0.1f;
         while (running) {
             while (SDL_PollEvent(&event)) {
                 switch (event.type) {
@@ -593,10 +759,10 @@ int main() {
             previous_time = current_time;
 
             uniform_buffer.upload(&uniform, sizeof(Uniform));
-            staging_sprite_buffer.upload(sprites.data(), sizeof(Sprite) * sprites.size());
-            for (const auto& [index, sprite] : std::ranges::views::enumerate(sprites)) {
-                sprite.rotation += angular_velocities[index] * delta_time;
-            }
+            glm::vec3 look_at_vector(cosf(current_time * speed_scale), 0.0f,
+                                     sinf(current_time * speed_scale));
+            uniform.view = glm::lookAt(camera_position, camera_position + look_at_vector,
+                                       glm::vec3(0.0f, 1.0f, 0.0f));
 
             render_graph->sync();
             std::optional<uint32_t> swapchain_index_opt =
