@@ -27,11 +27,17 @@ struct GraphicsPipelineResourceParams {
     std::string layout_identifier;
     std::vector<ShaderStage> shader_stages;
     std::vector<vk::Format> color_attachment_formats;
-    vk::SampleCountFlagBits rasterization_sample_count;
-    vk::VertexInputRate vertex_input_rate;
+    vk::Format depth_format;
+    vk::SampleCountFlagBits rasterization_sample_count = vk::SampleCountFlagBits::e1;
+    vk::VertexInputRate vertex_input_rate = vk::VertexInputRate::eVertex;
     vk::DeviceSize vertex_stride;
     std::vector<vk::VertexInputAttributeDescription> vertex_descriptions;
-    vk::PrimitiveTopology topology;
+    vk::PrimitiveTopology topology = vk::PrimitiveTopology::eTriangleList;
+    vk::FrontFace front_face = vk::FrontFace::eCounterClockwise;
+    vk::CullModeFlags cull_mode = vk::CullModeFlagBits::eBack;
+    vk::PolygonMode polygon_mode = vk::PolygonMode::eFill;
+    bool enable_depth_test = false;
+    bool enable_depth_write = false;
 };
 
 struct ComputePipelineResourceParams {

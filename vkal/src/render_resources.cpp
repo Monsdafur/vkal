@@ -50,11 +50,17 @@ RenderResources::create_graphics_pipeline(const GraphicsPipelineResourceParams& 
         .vkal_layout = *this->pipeline_layouts.at(pipeline_params.layout_identifier),
         .shader_stages = pipeline_params.shader_stages,
         .color_attachment_formats = pipeline_params.color_attachment_formats,
+        .depth_format = pipeline_params.depth_format,
         .rasterization_sample_count = pipeline_params.rasterization_sample_count,
         .vertex_input_rate = pipeline_params.vertex_input_rate,
         .vertex_stride = pipeline_params.vertex_stride,
         .vertex_descriptions = pipeline_params.vertex_descriptions,
         .topology = pipeline_params.topology,
+        .front_face = pipeline_params.front_face,
+        .cull_mode = pipeline_params.cull_mode,
+        .polygon_mode = pipeline_params.polygon_mode,
+        .enable_depth_test = pipeline_params.enable_depth_test,
+        .enable_depth_write = pipeline_params.enable_depth_write,
     });
     this->pipelines.insert_or_assign(pipeline_params.identifier, std::move(pipeline));
     return *this->pipelines.at(pipeline_params.identifier);

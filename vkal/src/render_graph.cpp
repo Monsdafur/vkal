@@ -501,6 +501,7 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
         command.pipelineBarrier2(dependency_info);
 
         vk::Extent3D render_extent;
+        std::optional<vk::RenderingAttachmentInfo> depth_attachment_opt = std::nullopt;
         if (!pass->render_attachment_builders.empty()) {
             for (const auto& [index, attachment_builder] :
                  std::ranges::views::enumerate(pass->render_attachment_builders)) {
@@ -535,7 +536,11 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
                     }
                 }
 
-                pass->render_attachment_infos.push_back(render_attachment_info);
+                if (attachment_builder.type == RenderAttachmentType::DEPTH) {
+                    depth_attachment_opt = render_attachment_info;
+                } else {
+                    pass->render_attachment_infos.push_back(render_attachment_info);
+                }
             }
 
             // Assume all render attachment images are of the same extent
@@ -545,6 +550,11 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
                                           vk::Extent2D(render_extent.width, render_extent.height)))
                 .setLayerCount(1)
                 .setColorAttachments(pass->render_attachment_infos);
+            // Set depth attachment if there is any
+            if (depth_attachment_opt.has_value()) {
+                rendering_info.setPDepthAttachment(&*depth_attachment_opt);
+            }
+
             command.beginRendering(rendering_info);
             pass->pass->render(command);
             command.endRendering();

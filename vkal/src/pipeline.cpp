@@ -80,8 +80,9 @@ Pipeline::Pipeline(const GraphicsPipelineParams& params)
     vk::PipelineRasterizationStateCreateInfo pipeline_rasterization_state;
     pipeline_rasterization_state.setDepthClampEnable(false)
         .setRasterizerDiscardEnable(false)
-        .setPolygonMode(vk::PolygonMode::eFill)
-        .setCullMode(vk::CullModeFlagBits::eNone)
+        .setPolygonMode(params.polygon_mode)
+        .setCullMode(params.cull_mode)
+        .setFrontFace(params.front_face)
         .setDepthBiasEnable(false)
         .setLineWidth(1.0f);
 
@@ -93,7 +94,13 @@ Pipeline::Pipeline(const GraphicsPipelineParams& params)
 
     // Depth stencil
     vk::PipelineDepthStencilStateCreateInfo pipeline_depth_stencil_state;
-    pipeline_depth_stencil_state.setDepthTestEnable(false).setDepthWriteEnable(false);
+    pipeline_depth_stencil_state.setDepthTestEnable(params.enable_depth_test)
+        .setDepthWriteEnable(params.enable_depth_write)
+        .setDepthCompareOp(vk::CompareOp::eLess)
+        .setDepthBoundsTestEnable(false)
+        .setMinDepthBounds(0.0f)
+        .setMaxDepthBounds(1.0f)
+        .setStencilTestEnable(false);
 
     // Color blend
     vk::PipelineColorBlendAttachmentState color_blend_attachment;
@@ -113,6 +120,9 @@ Pipeline::Pipeline(const GraphicsPipelineParams& params)
     // Pipeline rendering
     vk::PipelineRenderingCreateInfo pipeline_rendering_create_info;
     pipeline_rendering_create_info.setColorAttachmentFormats(params.color_attachment_formats);
+    if (params.enable_depth_test) {
+        pipeline_rendering_create_info.setDepthAttachmentFormat(params.depth_format);
+    }
 
     // Shader stage
     std::vector<vk::PipelineShaderStageCreateInfo> pipeline_shader_stage_create_infos;
