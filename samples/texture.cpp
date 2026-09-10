@@ -201,7 +201,8 @@ int main() {
             .bindings =
                 {
                     vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1,
-                                                   vk::ShaderStageFlagBits::eVertex),
+                                                   vk::ShaderStageFlagBits::eVertex |
+                                                       vk::ShaderStageFlagBits::eFragment),
                     vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer, 1,
                                                    vk::ShaderStageFlagBits::eVertex),
                     vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eSampler, 1,
@@ -427,51 +428,51 @@ int main() {
         std::array<uint32_t, 36> indices = {
             // Z-
             0,
+            2,
             1,
-            2,
             0,
-            2,
             3,
+            2,
 
             // Z+
             4,
+            6,
             5,
-            6,
             4,
-            6,
             7,
+            6,
 
             // X-
             8,
+            10,
             9,
-            10,
             8,
-            10,
             11,
+            10,
 
             // X+
             12,
+            14,
             13,
-            14,
             12,
-            14,
             15,
+            14,
 
             // Y-
             16,
+            18,
             17,
-            18,
             16,
-            18,
             19,
+            18,
 
             // Y+
             20,
+            22,
             21,
-            22,
             20,
-            22,
             23,
+            22,
         };
 
         Uniform uniform;
@@ -484,7 +485,7 @@ int main() {
                                        glm::vec3(0.0f, 1.0f, 0.0f));
             uniform.light_direction = glm::vec3(0.5f, -1.0f, 0.25f);
             uniform.light_direction = glm::normalize(uniform.light_direction);
-            uniform.diffuse = 0.4f;
+            uniform.diffuse = 1.0f;
             uniform.ambient = 0.07f;
         }
 
