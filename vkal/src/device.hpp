@@ -39,12 +39,16 @@ class Device {
 
     vk::CommandPool get_command_pool(uint32_t index);
 
+    const std::vector<vk::Format>& get_supported_depth_formats(vk::ImageTiling tiling) const;
+
   private:
     void select_physical_device(const DeviceParams& params);
 
     void create_device(const DeviceParams& params);
 
     void get_queues();
+
+    void query_depth_formats();
 
     Instance& vkal_instance;
     vk::PhysicalDeviceProperties physical_device_properties;
@@ -53,6 +57,8 @@ class Device {
     std::vector<vk::QueueFamilyProperties> queue_properties;
     std::vector<vk::Queue> queues;
     std::vector<vk::CommandPool> command_pools;
+    std::vector<vk::Format> linear_depth_formats;
+    std::vector<vk::Format> optimal_depth_formats;
 };
 
 using DevicePtr = std::unique_ptr<Device>;

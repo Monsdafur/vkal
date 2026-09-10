@@ -65,10 +65,25 @@ static bool is_device_suitable(const std::vector<vk::ExtensionProperties>& devic
 }
 
 ///////////////////////////////////////////////////////////
+static bool is_format_supported(vk::PhysicalDevice physical_device, vk::Format format,
+                                vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
+    vk::FormatProperties2 format_propeties = physical_device.getFormatProperties2(format);
+    switch (tiling) {
+    case vk::ImageTiling::eLinear:
+        return (format_propeties.formatProperties.linearTilingFeatures & features) == features;
+    case vk::ImageTiling::eOptimal:
+        return (format_propeties.formatProperties.optimalTilingFeatures & features) == features;
+    default:
+        throw std::runtime_error("Invalid image tiling");
+    }
+}
+
+///////////////////////////////////////////////////////////
 Device::Device(const DeviceParams& params) : vkal_instance(params.vkal_instance) {
     this->select_physical_device(params);
     this->create_device(params);
     this->get_queues();
+    this->query_depth_formats();
 }
 
 ///////////////////////////////////////////////////////////
@@ -122,8 +137,21 @@ vk::Queue Device::get_present_queue(const vk::SurfaceKHR& surface) {
     throw std::runtime_error("Failed to find any queue with surface support");
 }
 
+///////////////////////////////////////////////////////////
 vk::CommandPool Device::get_command_pool(uint32_t index) {
     return this->command_pools.at(index);
+}
+
+///////////////////////////////////////////////////////////
+const std::vector<vk::Format>& Device::get_supported_depth_formats(vk::ImageTiling tiling) const {
+    switch (tiling) {
+    case vk::ImageTiling::eLinear:
+        return this->linear_depth_formats;
+    case vk::ImageTiling::eOptimal:
+        return this->optimal_depth_formats;
+    default:
+        throw std::runtime_error("Invalid image tiling");
+    }
 }
 
 ///////////////////////////////////////////////////////////
@@ -220,6 +248,25 @@ void Device::get_queues() {
 
         command_pool_create_info.setQueueFamilyIndex(i);
         this->command_pools.push_back(this->device.createCommandPool(command_pool_create_info));
+    }
+}
+
+///////////////////////////////////////////////////////////
+void Device::query_depth_formats() {
+    std::array<vk::Format, 6> depth_formats = {
+        vk::Format::eD16Unorm,       vk::Format::eX8D24UnormPack32, vk::Format::eD32Sfloat,
+        vk::Format::eD16UnormS8Uint, vk::Format::eD24UnormS8Uint,   vk::Format::eD32SfloatS8Uint,
+    };
+
+    for (vk::Format format : depth_formats) {
+        if (is_format_supported(this->physical_device, format, vk::ImageTiling::eLinear,
+                                vk::FormatFeatureFlagBits::eDepthStencilAttachment)) {
+            this->linear_depth_formats.push_back(format);
+        }
+        if (is_format_supported(this->physical_device, format, vk::ImageTiling::eOptimal,
+                                vk::FormatFeatureFlagBits::eDepthStencilAttachment)) {
+            this->optimal_depth_formats.push_back(format);
+        }
     }
 }
 
