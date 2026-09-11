@@ -63,11 +63,10 @@ class VertexColorPass : public vkal::RenderPass {
         vkal::Pipeline& graphics_pipeline = *pipeline;
         command.bindPipeline(graphics_pipeline.get_bind_point(), graphics_pipeline.get());
         vk::DescriptorSet set = descriptor_sets->get(0);
-        command.bindDescriptorSets2(vk::BindDescriptorSetsInfo(
-            vk::ShaderStageFlagBits::eVertex, graphics_pipeline.get_layout().get(), 0, 1, &set, 0));
-        command.bindVertexBuffers2(0, vertex_buffer->get(), {0});
-        command.bindIndexBuffer2(index_buffer->get(), 0, index_buffer->get_size(),
-                                 vk::IndexType::eUint32);
+        command.bindDescriptorSets(this->pipeline->get_bind_point(),
+                                   this->pipeline->get_layout().get(), 0, set, {});
+        command.bindVertexBuffers(0, this->vertex_buffer->get(), {0});
+        command.bindIndexBuffer(this->index_buffer->get(), 0, vk::IndexType::eUint32);
         command.drawIndexed(3, 1, 0, 0, 0);
     }
 
@@ -191,6 +190,7 @@ int main() {
                                                             offsetof(Vertex, color)),
                     },
                 .topology = vk::PrimitiveTopology::eTriangleList,
+                .cull_mode = vk::CullModeFlagBits::eNone,
             });
 
         // Initializing resources
@@ -320,9 +320,9 @@ int main() {
         render_graph->compile();
 
         vkal_surface->set_resize_callback(
-            [&render_graph, &render_resources,
-             &msaa_params](const vk::SurfaceCapabilitiesKHR& surface_capabilities) {
-                vk::Extent3D extent = vk::Extent3D(surface_capabilities.currentExtent, 1);
+            [&render_graph, &render_resources, &msaa_params](const vk::Extent2D& old_extent,
+                                                             const vk::Extent2D& new_extent) {
+                vk::Extent3D extent = vk::Extent3D(new_extent, 1);
                 msaa_params.extent = extent;
                 render_resources->create_image(msaa_params);
                 render_graph->reset_swapchain_images();
