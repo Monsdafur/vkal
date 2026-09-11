@@ -96,7 +96,8 @@ vk::Semaphore& Surface::get_current_semaphore() {
 }
 
 ///////////////////////////////////////////////////////////
-void Surface::set_resize_callback(std::function<void(const vk::SurfaceCapabilitiesKHR&)> callback) {
+void Surface::set_resize_callback(
+    std::function<void(const vk::Extent2D&, const vk::Extent2D&)> callback) {
     this->resize_callback = callback;
 }
 
@@ -139,6 +140,7 @@ std::optional<uint32_t> Surface::acquire_next_frame(vk::Semaphore semaphore) {
         this->update_surface_capabilities();
         if (this->current_extent != this->capabilities.currentExtent) {
             this->create_swapchain();
+            this->resize_callback(this->current_extent, this->capabilities.currentExtent);
             this->current_extent = this->capabilities.currentExtent;
         }
         return std::nullopt;
@@ -178,6 +180,7 @@ void Surface::present() {
         this->update_surface_capabilities();
         if (this->current_extent != this->capabilities.currentExtent) {
             this->create_swapchain();
+            this->resize_callback(this->current_extent, this->capabilities.currentExtent);
             this->current_extent = this->capabilities.currentExtent;
         }
         break;
@@ -268,8 +271,6 @@ void Surface::create_swapchain() {
         });
         this->images.push_back(std::move(vkal_image));
     }
-
-    this->resize_callback(this->capabilities);
 
     // Create semaphores
     for (vk::Semaphore semaphore : this->semaphores) {

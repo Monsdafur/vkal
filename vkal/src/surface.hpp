@@ -31,7 +31,8 @@ class Surface {
 
     vk::Semaphore& get_current_semaphore();
 
-    void set_resize_callback(std::function<void(const vk::SurfaceCapabilitiesKHR&)> callback);
+    void
+    set_resize_callback(std::function<void(const vk::Extent2D&, const vk::Extent2D&)> callback);
 
     std::optional<uint32_t> acquire_next_frame(vk::Semaphore semaphore);
 
@@ -56,8 +57,8 @@ class Surface {
     uint32_t image_index = 0;
     SDL_Window* window;
 
-    std::function<void(const vk::SurfaceCapabilitiesKHR&)> resize_callback =
-        [](const vk::SurfaceCapabilitiesKHR&) {};
+    std::function<void(const vk::Extent2D&, const vk::Extent2D&)> resize_callback =
+        [](const vk::Extent2D&, const vk::Extent2D&) {};
 
     Instance& vkal_instance;
     Device& vkal_device;
