@@ -14,14 +14,13 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # Copy images to binary directory
 file(COPY "${CMAKE_SOURCE_DIR}/resources/textures" DESTINATION "${CMAKE_BINARY_DIR}/bin/resources")
+file(COPY "${CMAKE_SOURCE_DIR}/resources/data" DESTINATION "${CMAKE_BINARY_DIR}/bin/resources")
 
 # define macros
-if (UNIX)
-    add_compile_definitions(VULKAN_VERSION_1_4)
-endif()
+# add_compile_definitions(VULKAN_VERSION_1_4)
 add_compile_definitions(SLANG_PRIMARY)
 add_compile_definitions(ENABLE_VALIDATION)
-# add_compile_definitions(ENABLE_DEBUG)
+add_compile_definitions(ENABLE_DEBUG)
 
 # SPIR-V compilation
 find_program(SLANGC NAMES slangc)
@@ -88,16 +87,16 @@ add_executable(memory_allocator_test tests/memory_allocator_test.cpp)
 target_link_libraries(memory_allocator_test PUBLIC vkal GTest::gtest_main)
 
 add_executable(buffer_test tests/buffer_test.cpp)
-target_link_libraries(buffer_test PUBLIC vkal GTest::gtest_main)
+target_link_libraries(buffer_test PUBLIC vkal)
 
 add_executable(surface_test tests/surface_test.cpp)
-target_link_libraries(surface_test PUBLIC vkal GTest::gtest_main)
+target_link_libraries(surface_test PUBLIC vkal)
 
 add_executable(render_graph_test tests/render_graph_test.cpp)
-target_link_libraries(render_graph_test PUBLIC vkal GTest::gtest_main)
+target_link_libraries(render_graph_test PUBLIC vkal)
 
 add_executable(descriptor_test tests/descriptor_test.cpp)
-target_link_libraries(descriptor_test PUBLIC vkal GTest::gtest_main)
+target_link_libraries(descriptor_test PUBLIC vkal)
 
 include(GoogleTest)
 gtest_discover_tests(device_test)
@@ -123,6 +122,10 @@ target_compile_definitions(triangle PRIVATE _USE_MATH_DEFINES)
 add_executable(texture samples/texture.cpp)
 target_link_libraries(texture PUBLIC vkal-helper)
 target_compile_definitions(texture PRIVATE _USE_MATH_DEFINES)
+
+add_executable(tilemap samples/tilemap.cpp)
+target_link_libraries(tilemap PUBLIC vkal-helper)
+target_compile_definitions(tilemap PRIVATE _USE_MATH_DEFINES)
 
 # Apply clang-format
 file (GLOB_RECURSE SOURCES

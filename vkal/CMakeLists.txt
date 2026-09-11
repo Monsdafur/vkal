@@ -36,4 +36,4 @@ file (GLOB VKAL_SRC
 )
 add_library(vkal STATIC ${VKAL_SRC})
 include_directories(vkal PUBLIC ${CMAKE_SOURCE_DIR}/vkal)
-target_link_libraries(vkal PUBLIC SDL3::SDL3 SDL3_image::SDL3_image Vulkan::Vulkan)
+target_link_libraries(vkal PUBLIC SDL3::SDL3 SDL3_image::SDL3_image Vulkan::Vulkan GTest::gtest_main)
