@@ -1,6 +1,8 @@
 #include "utilities.hpp"
 
 #include <cmath>
+#include <fstream>
+#include <print>
 #include <ranges>
 
 ///////////////////////////////////////////////////////////
@@ -244,4 +246,36 @@ load_images(vk::Queue queue, vk::CommandBuffer command, vkal::Device& device,
     }
 
     return image_map;
+}
+
+///////////////////////////////////////////////////////////
+nlohmann::json load_level_from_path(const std::filesystem::path& path, const std::string& level) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        throw std::runtime_error(
+            std::format("Failed to load json file at path {}", path.generic_string()));
+    }
+
+    nlohmann::json json_data;
+    file >> json_data;
+    nlohmann::json levels = json_data.at("levels");
+    std::optional<std::reference_wrapper<const nlohmann::json>> level_data_opt;
+    for (const nlohmann::json& level_data : levels) {
+        if (level_data.at("identifier").get<std::string>() == level) {
+            level_data_opt = level_data;
+            break;
+        }
+    }
+    if (!level_data_opt.has_value()) {
+        throw std::runtime_error(std::format("Cannot find any level with identifer {}", level));
+    }
+    const nlohmann::json& level_data = *level_data_opt;
+    for (const auto& [index, layer] : level_data.at("layerInstances").items()) {
+        std::println("Layer {}:", index);
+        for (const auto& [key, value] : layer.items()) {
+            std::println("{} {}", key, value.type_name());
+        }
+    }
+
+    return json_data;
 }

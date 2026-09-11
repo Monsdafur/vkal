@@ -293,8 +293,8 @@ int main() {
                     },
             });
 
-            std::vector<vkal::RenderAttachmentParams> render_attachments = {
-                vkal::RenderAttachmentParams{
+            std::vector<vkal::RenderAttachmentDescription> render_attachments = {
+                vkal::RenderAttachmentDescription{
                     .type = vkal::RenderAttachmentType::SWAPCHAIN,
                     .identifier = "main attachment",
                     .image = "msaa",
@@ -306,15 +306,16 @@ int main() {
                 },
             };
 
-            vkal::RenderPassParams pass_params{
+            vkal::RenderPassDescription pass_description{
                 .identifier = "final pass",
                 .buffer_resources = resrouces_descriptions,
                 .image_resources = image_resrouces_descriptions,
                 .render_attachments = render_attachments,
                 .pipeline = "graphics pipeline",
-                .pass = std::make_unique<VertexColorPass>(),
             };
-            render_graph->add_pass(std::move(pass_params));
+            std::unique_ptr<VertexColorPass> vertex_color_pass =
+                std::make_unique<VertexColorPass>();
+            render_graph->add_pass(std::move(vertex_color_pass), pass_description);
         }
 
         render_graph->compile();
@@ -325,7 +326,6 @@ int main() {
                 vk::Extent3D extent = vk::Extent3D(new_extent, 1);
                 msaa_params.extent = extent;
                 render_resources->create_image(msaa_params);
-                render_graph->reset_swapchain_images();
                 render_graph->rebind_resources();
             });
 

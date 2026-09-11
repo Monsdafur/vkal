@@ -676,8 +676,8 @@ int main() {
                 .binding = 2,
             });
 
-            std::vector<vkal::RenderAttachmentParams> render_attachments;
-            render_attachments.push_back(vkal::RenderAttachmentParams{
+            std::vector<vkal::RenderAttachmentDescription> render_attachments;
+            render_attachments.push_back(vkal::RenderAttachmentDescription{
                 .type = vkal::RenderAttachmentType::SWAPCHAIN,
                 .identifier = "main attachment",
                 .image = "msaa",
@@ -687,7 +687,7 @@ int main() {
                 .load_op = vk::AttachmentLoadOp::eClear,
                 .store_op = vk::AttachmentStoreOp::eStore,
             });
-            render_attachments.push_back(vkal::RenderAttachmentParams{
+            render_attachments.push_back(vkal::RenderAttachmentDescription{
                 .type = vkal::RenderAttachmentType::DEPTH,
                 .identifier = "depth attachment",
                 .image = "depth",
@@ -699,16 +699,15 @@ int main() {
             std::unique_ptr<TexturePass> texture_pass_ptr =
                 std::make_unique<TexturePass>(window_extent);
             texture_pass = texture_pass_ptr.get();
-            vkal::RenderPassParams pass_params{
+            vkal::RenderPassDescription pass_description{
                 .identifier = "texture pass",
                 .buffer_resources = buffer_resrouces_descriptions,
                 .image_resources = image_resrouces_descriptions,
                 .render_attachments = render_attachments,
                 .sampler_resources = sampler_resouces_description,
                 .pipeline = "texture map pipeline",
-                .pass = std::move(texture_pass_ptr),
             };
-            render_graph->add_pass(std::move(pass_params));
+            render_graph->add_pass(std::move(texture_pass_ptr), std::move(pass_description));
         }
 
         render_graph->compile();
@@ -723,7 +722,6 @@ int main() {
                 render_resources->create_image(msaa_params);
                 render_resources->create_image(depth_params);
 
-                render_graph->reset_swapchain_images();
                 render_graph->rebind_resources();
 
                 float fwidth = static_cast<float>(extent.width);
