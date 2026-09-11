@@ -8,7 +8,7 @@ namespace vkal {
 std::string size_as_string(vk::DeviceSize size) {
     std::string level[4] = {"B", "KiB", "MB", "GiB"};
     size_t current_level = 0;
-    while (size >= 1024 && current_level <= 3) {
+    while (size >= 1024 && current_level < 3) {
         size /= 1024;
         current_level++;
     }
