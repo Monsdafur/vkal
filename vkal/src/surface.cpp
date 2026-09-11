@@ -73,7 +73,7 @@ evaluate_present_modes(const std::vector<vk::PresentModeKHR>& available_present_
 
 ///////////////////////////////////////////////////////////
 Surface::Surface(const SurfaceParams& params)
-    : window(params.window), vkal_instance(params.vkal_instance), vkal_device(params.vkal_device) {
+    : window(params.window), instance(params.instance), device(params.device) {
     this->create_surface();
     this->update_surface_capabilities();
     this->setup_surface_settings(params);
@@ -83,16 +83,16 @@ Surface::Surface(const SurfaceParams& params)
 
 ///////////////////////////////////////////////////////////
 Surface::~Surface() {
-    for (vk::Semaphore semaphore : this->semaphores) {
-        this->vkal_device.get().destroySemaphore(semaphore);
+    for (vk::Semaphore semaphore : this->vk_semaphores) {
+        this->device.get().destroySemaphore(semaphore);
     }
-    this->vkal_device.get().destroySwapchainKHR(this->swapchain);
-    this->vkal_instance.get().destroySurfaceKHR(this->surface);
+    this->device.get().destroySwapchainKHR(this->vk_swapchain);
+    this->instance.get().destroySurfaceKHR(this->vk_surface);
 }
 
 ///////////////////////////////////////////////////////////
 vk::Semaphore& Surface::get_current_semaphore() {
-    return this->semaphores.at(this->image_index);
+    return this->vk_semaphores.at(this->image_index);
 }
 
 ///////////////////////////////////////////////////////////
@@ -109,14 +109,14 @@ std::optional<uint32_t> Surface::acquire_next_frame(vk::Semaphore semaphore) {
     }
 
     vk::AcquireNextImageInfoKHR acquire_info;
-    acquire_info.setSwapchain(this->swapchain)
+    acquire_info.setSwapchain(this->vk_swapchain)
         .setSemaphore(semaphore)
         .setTimeout(UINT64_MAX)
         .setDeviceMask(1);
     vk::Result acquire_result;
     try {
         vk::ResultValue<uint32_t> acquire_result_value =
-            this->vkal_device.get().acquireNextImage2KHR(acquire_info);
+            this->device.get().acquireNextImage2KHR(acquire_info);
         this->image_index = acquire_result_value.value;
         acquire_result = acquire_result_value.result;
     } catch (const vk::OutOfDateKHRError& e) {
@@ -136,7 +136,7 @@ std::optional<uint32_t> Surface::acquire_next_frame(vk::Semaphore semaphore) {
         return this->image_index;
     case vk::Result::eSuboptimalKHR:
     case vk::Result::eErrorOutOfDateKHR:
-        this->vkal_device.get().waitIdle();
+        this->device.get().waitIdle();
         this->update_surface_capabilities();
         if (this->current_extent != this->capabilities.currentExtent) {
             this->create_swapchain();
@@ -153,13 +153,13 @@ std::optional<uint32_t> Surface::acquire_next_frame(vk::Semaphore semaphore) {
 ///////////////////////////////////////////////////////////
 void Surface::present() {
     vk::PresentInfoKHR present_info;
-    present_info.setSwapchains(this->swapchain)
-        .setWaitSemaphores(this->semaphores[this->image_index])
+    present_info.setSwapchains(this->vk_swapchain)
+        .setWaitSemaphores(this->vk_semaphores[this->image_index])
         .setImageIndices(this->image_index);
 
     vk::Result present_result;
     try {
-        present_result = this->present_queue.presentKHR(present_info);
+        present_result = this->vk_present_queue.presentKHR(present_info);
     } catch (const vk::OutOfDateKHRError& e) {
         present_result = vk::Result::eErrorOutOfDateKHR;
     }
@@ -176,7 +176,7 @@ void Surface::present() {
     case vk::Result::eSuboptimalKHR:
     case vk::Result::eErrorOutOfDateKHR:
 
-        this->vkal_device.get().waitIdle();
+        this->device.get().waitIdle();
         this->update_surface_capabilities();
         if (this->current_extent != this->capabilities.currentExtent) {
             this->create_swapchain();
@@ -193,15 +193,15 @@ void Surface::present() {
 ///////////////////////////////////////////////////////////
 void Surface::create_surface() {
     VkSurfaceKHR surface_handler = nullptr;
-    SDL_Vulkan_CreateSurface(this->window, this->vkal_instance.get(), nullptr, &surface_handler);
-    this->surface = vk::SurfaceKHR(surface_handler);
-    this->present_queue = this->vkal_device.get_present_queue(this->surface);
-    this->surface_info.setSurface(this->surface);
+    SDL_Vulkan_CreateSurface(this->window, this->instance.get(), nullptr, &surface_handler);
+    this->vk_surface = vk::SurfaceKHR(surface_handler);
+    this->vk_present_queue = this->device.get_present_queue(this->vk_surface);
+    this->surface_info.setSurface(this->vk_surface);
 }
 
 ///////////////////////////////////////////////////////////
 void Surface::update_surface_capabilities() {
-    this->capabilities = this->vkal_device.get_physical()
+    this->capabilities = this->device.get_physical()
                              .getSurfaceCapabilities2KHR(this->surface_info)
                              .surfaceCapabilities;
 }
@@ -210,12 +210,12 @@ void Surface::update_surface_capabilities() {
 void Surface::setup_surface_settings(const SurfaceParams& params) {
     // Evaluate surface formats
     std::vector<vk::SurfaceFormat2KHR> surface_formats =
-        this->vkal_device.get_physical().getSurfaceFormats2KHR(surface_info);
+        this->device.get_physical().getSurfaceFormats2KHR(surface_info);
     this->surface_format = evaluate_surface_format(surface_formats, params.surface_format);
 
     // Evaluate present modes
     std::vector<vk::PresentModeKHR> available_present_modes =
-        this->vkal_device.get_physical().getSurfacePresentModesKHR(this->surface);
+        this->device.get_physical().getSurfacePresentModesKHR(this->vk_surface);
     this->present_mode = evaluate_present_modes(available_present_modes, params.present_modes);
 
     // Calculate swapchain image count
@@ -231,7 +231,7 @@ void Surface::setup_surface_settings(const SurfaceParams& params) {
 void Surface::create_swapchain() {
     // Create swapchain
     vk::SwapchainCreateInfoKHR swapchain_create_info;
-    swapchain_create_info.setSurface(this->surface)
+    swapchain_create_info.setSurface(this->vk_surface)
         .setMinImageCount(this->image_count)
         .setImageFormat(this->surface_format.format)
         .setImageColorSpace(this->surface_format.colorSpace)
@@ -245,41 +245,42 @@ void Surface::create_swapchain() {
         .setClipped(true);
 
     if (this->initialized) {
-        swapchain_create_info.setOldSwapchain(this->swapchain);
+        swapchain_create_info.setOldSwapchain(this->vk_swapchain);
     }
 
     vk::SwapchainKHR new_swapchain =
-        this->vkal_device.get().createSwapchainKHR(swapchain_create_info);
+        this->device.get().createSwapchainKHR(swapchain_create_info);
     if (this->initialized) {
-        this->vkal_device.get().destroySwapchainKHR(this->swapchain);
+        this->device.get().destroySwapchainKHR(this->vk_swapchain);
     }
-    this->swapchain = new_swapchain;
+    this->vk_swapchain = new_swapchain;
 
     this->initialized = true;
 
     // Create frame resources
     this->images.clear();
     std::vector<vk::Image> swapchain_images =
-        this->vkal_device.get().getSwapchainImagesKHR(this->swapchain);
+        this->device.get().getSwapchainImagesKHR(this->vk_swapchain);
     for (vk::Image& image : swapchain_images) {
-        ImagePtr vkal_image = swapchain_image_ptr(SwapchainImageParams{
-            .vkal_device = this->vkal_device,
+        ImagePtr image_ptr_obj = swapchain_image_ptr(SwapchainImageParams{
+            .device = this->device,
             .image = image,
             .extent = this->capabilities.currentExtent,
             .format = this->surface_format.format,
             .aspects = vk::ImageAspectFlagBits::eColor,
         });
-        this->images.push_back(std::move(vkal_image));
+        this->images.push_back(std::move(image_ptr_obj));
     }
 
     // Create semaphores
-    for (vk::Semaphore semaphore : this->semaphores) {
-        this->vkal_device.get().destroySemaphore(semaphore);
+    for (vk::Semaphore semaphore : this->vk_semaphores) {
+        this->device.get().destroySemaphore(semaphore);
     }
-    this->semaphores.clear();
+    this->vk_semaphores.clear();
     vk::SemaphoreCreateInfo semaphore_create_info;
     for (size_t i = 0; i < this->images.size(); ++i) {
-        this->semaphores.push_back(this->vkal_device.get().createSemaphore(semaphore_create_info));
+        this->vk_semaphores.push_back(
+            this->device.get().createSemaphore(semaphore_create_info));
     }
 }
 

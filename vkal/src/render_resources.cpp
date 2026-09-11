@@ -4,7 +4,7 @@ namespace vkal {
 
 ///////////////////////////////////////////////////////////
 RenderResources::RenderResources(const RenderResourcesParams& params)
-    : vkal_device(params.vkal_device), memory_allocator(params.memory_allocator) {
+    : device(params.device), memory_allocator(params.memory_allocator) {
 }
 
 ///////////////////////////////////////////////////////////
@@ -15,7 +15,7 @@ RenderResources::~RenderResources() {
 DescriptorLayout& RenderResources::create_descriptor_layout(
     const DescriptorLayoutResourceParams& descriptor_layout_params) {
     DescriptorLayoutPtr descriptor_layout = descriptor_layout_ptr(
-        DescriptorLayoutParams{.vkal_device = this->vkal_device,
+        DescriptorLayoutParams{.device = this->device,
                                .bindings = descriptor_layout_params.bindings,
                                .binding_flags = descriptor_layout_params.binding_flags});
 
@@ -32,8 +32,8 @@ PipelineLayout& RenderResources::create_pipeline_layout(
         descriptor_layouts.push_back(*this->descriptor_layouts.at(identifier));
     }
     PipelineLayoutPtr pipeline_layout = pipeline_layout_ptr(PipelineLayoutParams{
-        .vkal_device = this->vkal_device,
-        .vkal_descriptor_layouts = descriptor_layouts,
+        .device = this->device,
+        .descriptor_layouts = descriptor_layouts,
         .push_constants = pipeline_layout_params.push_constants,
     });
 
@@ -46,8 +46,8 @@ PipelineLayout& RenderResources::create_pipeline_layout(
 Pipeline&
 RenderResources::create_graphics_pipeline(const GraphicsPipelineResourceParams& pipeline_params) {
     PipelinePtr pipeline = graphics_pipeline_ptr(GraphicsPipelineParams{
-        .vkal_device = this->vkal_device,
-        .vkal_layout = *this->pipeline_layouts.at(pipeline_params.layout_identifier),
+        .device = this->device,
+        .layout = *this->pipeline_layouts.at(pipeline_params.layout_identifier),
         .shader_stages = pipeline_params.shader_stages,
         .color_attachment_formats = pipeline_params.color_attachment_formats,
         .depth_format = pipeline_params.depth_format,
@@ -70,8 +70,8 @@ RenderResources::create_graphics_pipeline(const GraphicsPipelineResourceParams& 
 Pipeline&
 RenderResources::create_compute_pipeline(const ComputePipelineResourceParams& pipeline_params) {
     PipelinePtr pipeline = compute_pipeline_ptr(ComputePipelineParams{
-        .vkal_device = this->vkal_device,
-        .vkal_layout = *this->pipeline_layouts.at(pipeline_params.identifier),
+        .device = this->device,
+        .layout = *this->pipeline_layouts.at(pipeline_params.identifier),
         .shader_stage = pipeline_params.shader_stage,
     });
     this->pipelines.insert_or_assign(pipeline_params.identifier, std::move(pipeline));
@@ -81,7 +81,7 @@ RenderResources::create_compute_pipeline(const ComputePipelineResourceParams& pi
 ///////////////////////////////////////////////////////////
 Buffer& RenderResources::create_buffer(const BufferResourceParams& buffer_params) {
     BufferPtr buffer = buffer_ptr(BufferParams{
-        .vkal_device = this->vkal_device,
+        .device = this->device,
         .memory_allocator = this->memory_allocator,
         .size = buffer_params.size,
         .usage = buffer_params.usage,
@@ -95,7 +95,7 @@ Buffer& RenderResources::create_buffer(const BufferResourceParams& buffer_params
 ///////////////////////////////////////////////////////////
 Image& RenderResources::create_image(const ImageResourceParams& image_params) {
     ImagePtr image = image_ptr(ImageParams{
-        .vkal_device = this->vkal_device,
+        .device = this->device,
         .memory_allocator = this->memory_allocator,
         .type = image_params.type,
         .view_type = image_params.view_type,
@@ -115,7 +115,7 @@ Image& RenderResources::create_image(const ImageResourceParams& image_params) {
 ///////////////////////////////////////////////////////////
 Sampler& RenderResources::create_sampler(const SamplerResourceParams& sampler_params) {
     SamplerPtr sampler = sampler_ptr(SamplerParams{
-        .vkal_device = this->vkal_device,
+        .device = this->device,
         .address_mode = sampler_params.address_mode,
         .filter = sampler_params.filter,
         .mip_lod_bias = sampler_params.mip_lod_bias,

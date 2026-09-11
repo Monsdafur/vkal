@@ -15,8 +15,8 @@ struct ShaderStage {
 };
 
 struct GraphicsPipelineParams {
-    Device& vkal_device;
-    PipelineLayout& vkal_layout;
+    Device& device;
+    PipelineLayout& layout;
     std::vector<ShaderStage> shader_stages;
     std::vector<vk::Format> color_attachment_formats;
     vk::Format depth_format;
@@ -33,8 +33,8 @@ struct GraphicsPipelineParams {
 };
 
 struct ComputePipelineParams {
-    Device& vkal_device;
-    PipelineLayout& vkal_layout;
+    Device& device;
+    PipelineLayout& layout;
     ShaderStage shader_stage;
 };
 
@@ -59,10 +59,10 @@ class Pipeline {
     vk::PipelineBindPoint get_bind_point();
 
   private:
-    Device& vkal_device;
-    PipelineLayout& vkal_layout;
+    Device& device;
+    PipelineLayout& layout;
     vk::PipelineBindPoint bind_point;
-    vk::Pipeline pipeline;
+    vk::Pipeline vk_pipeline;
 };
 
 using PipelinePtr = std::unique_ptr<Pipeline>;

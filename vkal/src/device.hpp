@@ -9,7 +9,7 @@
 namespace vkal {
 
 struct DeviceParams {
-    Instance& vkal_instance;
+    Instance& instance;
     std::vector<std::string> device_extensions;
 };
 
@@ -50,13 +50,13 @@ class Device {
 
     void query_depth_formats();
 
-    Instance& vkal_instance;
+    Instance& instance;
     vk::PhysicalDeviceProperties physical_device_properties;
-    vk::PhysicalDevice physical_device = nullptr;
-    vk::Device device = nullptr;
+    vk::PhysicalDevice vk_physical_device = nullptr;
+    vk::Device vk_device = nullptr;
     std::vector<vk::QueueFamilyProperties> queue_properties;
-    std::vector<vk::Queue> queues;
-    std::vector<vk::CommandPool> command_pools;
+    std::vector<vk::Queue> vk_queues;
+    std::vector<vk::CommandPool> vk_command_pools;
     std::vector<vk::Format> linear_depth_formats;
     std::vector<vk::Format> optimal_depth_formats;
 };

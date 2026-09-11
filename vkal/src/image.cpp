@@ -4,13 +4,13 @@ namespace vkal {
 
 ///////////////////////////////////////////////////////////
 Image::Image(const ImageParams& params)
-    : vkal_device(params.vkal_device), type(params.type), view_type(params.view_type),
+    : device(params.device), type(params.type), view_type(params.view_type),
       extent(params.extent), format(params.format), aspects(params.aspects),
-      mip_levels(params.mip_levels), image(this->create_image(params)),
+      mip_levels(params.mip_levels), vk_image(this->create_image(params)),
       memory_requirements(this->get_requirements()),
-      allocator_info(params.memory_allocator.bind_image(this->image, params.memory_properties,
-                                                        this->memory_requirements)),
-      view(this->create_view()) {
+      allocator_info(params.memory_allocator.bind_image(this->vk_image, params.memory_properties,
+                                                         this->memory_requirements)),
+      vk_view(this->create_view()) {
     this->is_swapchain_owned = false;
 
     this->accesses = std::vector<vk::AccessFlags2>(this->mip_levels, vk::AccessFlagBits2::eNone);
@@ -21,9 +21,9 @@ Image::Image(const ImageParams& params)
 
 ///////////////////////////////////////////////////////////
 Image::Image(const SwapchainImageParams& params)
-    : vkal_device(params.vkal_device), type(vk::ImageType::e2D), view_type(vk::ImageViewType::e2D),
+    : device(params.device), type(vk::ImageType::e2D), view_type(vk::ImageViewType::e2D),
       extent(params.extent, 1), format(params.format), aspects(params.aspects), mip_levels(1),
-      image(params.image), view(this->create_view()) {
+      vk_image(params.image), vk_view(this->create_view()) {
     this->is_swapchain_owned = true;
 
     this->accesses = std::vector<vk::AccessFlags2>(this->mip_levels, vk::AccessFlagBits2::eNone);
@@ -34,9 +34,9 @@ Image::Image(const SwapchainImageParams& params)
 
 ///////////////////////////////////////////////////////////
 Image::~Image() {
-    this->vkal_device.get().destroyImageView(this->view);
+    this->device.get().destroyImageView(this->vk_view);
     if (!this->is_swapchain_owned) {
-        this->vkal_device.get().destroyImage(this->image);
+        this->device.get().destroyImage(this->vk_image);
 
         // Sync with memory allocator data
         this->allocator_info->block.remove_chunk(this->allocator_info->chunk);
@@ -64,7 +64,7 @@ const vk::MemoryRequirements Image::get_memory_requirements() const {
 
 ///////////////////////////////////////////////////////////
 vk::Image Image::get() {
-    return this->image;
+    return this->vk_image;
 }
 
 ///////////////////////////////////////////////////////////
@@ -78,7 +78,7 @@ vk::Extent3D Image::get_extent() const {
 
 ///////////////////////////////////////////////////////////
 vk::ImageView Image::get_view() const {
-    return this->view;
+    return this->vk_view;
 }
 
 ///////////////////////////////////////////////////////////
@@ -94,14 +94,14 @@ vk::Image Image::create_image(const ImageParams& params) {
         .setSharingMode(vk::SharingMode::eExclusive)
         .setTiling(vk::ImageTiling::eOptimal);
 
-    return this->vkal_device.get().createImage(image_create_info);
+    return this->device.get().createImage(image_create_info);
 }
 
 ///////////////////////////////////////////////////////////
 vk::MemoryRequirements Image::get_requirements() {
     vk::ImageMemoryRequirementsInfo2 memory_requirements_info;
-    memory_requirements_info.setImage(this->image);
-    return this->vkal_device.get()
+    memory_requirements_info.setImage(this->vk_image);
+    return this->device.get()
         .getImageMemoryRequirements2(memory_requirements_info)
         .memoryRequirements;
 }
@@ -128,13 +128,13 @@ vk::ImageView Image::create_view() {
         .setBaseArrayLayer(0)
         .setLayerCount(1);
 
-    image_view_create_info.setImage(this->image)
+    image_view_create_info.setImage(this->vk_image)
         .setViewType(this->view_type)
         .setFormat(this->format)
         .setComponents(component_mapping)
         .setSubresourceRange(sub_resource_range);
 
-    return this->vkal_device.get().createImageView(image_view_create_info);
+    return this->device.get().createImageView(image_view_create_info);
 }
 
 ///////////////////////////////////////////////////////////

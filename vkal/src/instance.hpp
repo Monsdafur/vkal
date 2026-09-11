@@ -28,8 +28,8 @@ class Instance {
     void create_message_debugger();
 
     vk::detail::DynamicLoader dynamic_loader;
-    vk::Instance instance = nullptr;
-    vk::DebugUtilsMessengerEXT debugger = nullptr;
+    vk::Instance vk_instance = nullptr;
+    vk::DebugUtilsMessengerEXT vk_debugger = nullptr;
 };
 
 using InstancePtr = std::unique_ptr<Instance>;

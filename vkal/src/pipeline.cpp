@@ -46,7 +46,7 @@ static vk::ShaderModule create_shader_module(vk::Device device,
 
 ///////////////////////////////////////////////////////////
 Pipeline::Pipeline(const GraphicsPipelineParams& params)
-    : vkal_device(params.vkal_device), vkal_layout(params.vkal_layout) {
+    : device(params.device), layout(params.layout) {
     // Set bind point
     this->bind_point = vk::PipelineBindPoint::eGraphics;
 
@@ -129,7 +129,7 @@ Pipeline::Pipeline(const GraphicsPipelineParams& params)
     std::vector<vk::ShaderModule> shader_modules;
     for (ShaderStage shader_stage : params.shader_stages) {
         vk::ShaderModule module =
-            create_shader_module(params.vkal_device.get(), shader_stage.file_path);
+            create_shader_module(params.device.get(), shader_stage.file_path);
         vk::PipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
         pipeline_shader_stage_create_info.setStage(shader_stage.stage).setModule(module);
 
@@ -173,20 +173,20 @@ Pipeline::Pipeline(const GraphicsPipelineParams& params)
         .setPDepthStencilState(&pipeline_depth_stencil_state)
         .setPColorBlendState(&pipeline_color_blend_state_create_info)
         .setPDynamicState(&pipeline_dynamic_state_create_info)
-        .setLayout(this->vkal_layout.get());
+        .setLayout(this->layout.get());
 
     vk::ResultValue<vk::Pipeline> pipeline_result =
-        this->vkal_device.get().createGraphicsPipeline(nullptr, pipeline_create_info);
+        this->device.get().createGraphicsPipeline(nullptr, pipeline_create_info);
 
     if (pipeline_result.result == vk::Result::eSuccess) {
-        this->pipeline = pipeline_result.value;
+        this->vk_pipeline = pipeline_result.value;
         for (vk::ShaderModule module : shader_modules) {
-            this->vkal_device.get().destroyShaderModule(module);
+            this->device.get().destroyShaderModule(module);
         }
     } else {
-        this->pipeline = pipeline_result.value;
+        this->vk_pipeline = pipeline_result.value;
         for (vk::ShaderModule module : shader_modules) {
-            this->vkal_device.get().destroyShaderModule(module);
+            this->device.get().destroyShaderModule(module);
         }
         throw std::runtime_error(std::format("Failed to create graphics pipeline due to {}",
                                              vk::to_string(pipeline_result.result)));
@@ -195,13 +195,13 @@ Pipeline::Pipeline(const GraphicsPipelineParams& params)
 
 ///////////////////////////////////////////////////////////
 Pipeline::Pipeline(const ComputePipelineParams& params)
-    : vkal_device(params.vkal_device), vkal_layout(params.vkal_layout) {
+    : device(params.device), layout(params.layout) {
     // Set bind point
     this->bind_point = vk::PipelineBindPoint::eCompute;
 
     // Shader stage
     vk::ShaderModule shader_module =
-        create_shader_module(params.vkal_device.get(), params.shader_stage.file_path);
+        create_shader_module(params.device.get(), params.shader_stage.file_path);
     vk::PipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
     pipeline_shader_stage_create_info.setStage(params.shader_stage.stage).setModule(shader_module);
 
@@ -216,16 +216,16 @@ Pipeline::Pipeline(const ComputePipelineParams& params)
     // Create pipeline
     vk::ComputePipelineCreateInfo pipeline_create_info;
     pipeline_create_info.setStage(pipeline_shader_stage_create_info)
-        .setLayout(this->vkal_layout.get());
+        .setLayout(this->layout.get());
 
     vk::ResultValue<vk::Pipeline> pipeline_result =
-        this->vkal_device.get().createComputePipeline(nullptr, pipeline_create_info);
+        this->device.get().createComputePipeline(nullptr, pipeline_create_info);
 
     if (pipeline_result.result == vk::Result::eSuccess) {
-        this->pipeline = pipeline_result.value;
-        this->vkal_device.get().destroyShaderModule(shader_module);
+        this->vk_pipeline = pipeline_result.value;
+        this->device.get().destroyShaderModule(shader_module);
     } else {
-        this->vkal_device.get().destroyShaderModule(shader_module);
+        this->device.get().destroyShaderModule(shader_module);
         throw std::runtime_error(std::format("Failed to create graphics pipeline due to {}",
                                              vk::to_string(pipeline_result.result)));
     }
@@ -233,17 +233,17 @@ Pipeline::Pipeline(const ComputePipelineParams& params)
 
 ///////////////////////////////////////////////////////////
 Pipeline::~Pipeline() {
-    this->vkal_device.get().destroyPipeline(this->pipeline);
+    this->device.get().destroyPipeline(this->vk_pipeline);
 }
 
 ///////////////////////////////////////////////////////////
 vk::Pipeline Pipeline::get() {
-    return this->pipeline;
+    return this->vk_pipeline;
 }
 
 ///////////////////////////////////////////////////////////
 PipelineLayout& Pipeline::get_layout() {
-    return this->vkal_layout;
+    return this->layout;
 }
 
 ///////////////////////////////////////////////////////////

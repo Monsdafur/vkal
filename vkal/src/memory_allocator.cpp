@@ -23,7 +23,7 @@ static uint32_t find_memory_type(vk::PhysicalDevice physical_device, uint32_t fi
 
 ///////////////////////////////////////////////////////////
 MemoryAllocator::MemoryAllocator(const MemoryAllocatorParams& params)
-    : vkal_device(params.vkal_device), block_size(params.block_size) {
+    : device(params.device), block_size(params.block_size) {
 }
 
 ///////////////////////////////////////////////////////////
@@ -35,9 +35,9 @@ MemoryAllocator::bind_buffer(vk::Buffer buffer, vk::MemoryPropertyFlags memory_p
     // Bind buffer
     vk::BindBufferMemoryInfo bind_buffer_info;
     bind_buffer_info.setBuffer(buffer)
-        .setMemory(allocator_info.block.memory)
+        .setMemory(allocator_info.block.vk_memory)
         .setMemoryOffset(allocator_info.chunk.offset);
-    this->vkal_device.get().bindBufferMemory2(bind_buffer_info);
+    this->device.get().bindBufferMemory2(bind_buffer_info);
 
     return allocator_info;
 }
@@ -50,9 +50,9 @@ MemoryAllocatorInfo MemoryAllocator::bind_image(vk::Image image,
     // Bind image
     vk::BindImageMemoryInfo bind_image_info;
     bind_image_info.setImage(image)
-        .setMemory(allocator_info.block.memory)
+        .setMemory(allocator_info.block.vk_memory)
         .setMemoryOffset(allocator_info.chunk.offset);
-    this->vkal_device.get().bindImageMemory2(bind_image_info);
+    this->device.get().bindImageMemory2(bind_image_info);
 
     return allocator_info;
 }
@@ -102,7 +102,7 @@ MemoryAllocator::query_block(vk::MemoryPropertyFlags memory_properties,
             size_as_string(memory_requirements.size), size_as_string(this->block_size)));
     }
 
-    uint32_t memory_type = find_memory_type(this->vkal_device.get_physical(),
+    uint32_t memory_type = find_memory_type(this->device.get_physical(),
                                             memory_requirements.memoryTypeBits, memory_properties);
 
     std::optional<std::reference_wrapper<MemoryBlock>> query_block;
@@ -130,7 +130,7 @@ MemoryAllocator::query_block(vk::MemoryPropertyFlags memory_properties,
     // If no suitable memory block is found create a new block
     if (!query_block.has_value()) {
         this->blocks.push_back(memory_block_ptr(MemoryBlockParams{
-            .vkal_device = this->vkal_device,
+            .device = this->device,
             .block_size = this->block_size,
             .properties = memory_properties,
             .memory_requirements = memory_requirements,

@@ -8,7 +8,7 @@
 namespace vkal {
 
 struct CommandParams {
-    Device& vkal_device;
+    Device& device;
     vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary;
     uint32_t queue_index;
     uint32_t command_count = 1;
@@ -29,9 +29,9 @@ class Command {
     vk::CommandBuffer get(uint32_t index);
 
   private:
-    Device& vkal_device;
-    vk::CommandPool command_pool;
-    std::vector<vk::CommandBuffer> commands;
+    Device& device;
+    vk::CommandPool vk_command_pool;
+    std::vector<vk::CommandBuffer> vk_commands;
 };
 
 using CommandPtr = std::unique_ptr<Command>;

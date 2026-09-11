@@ -79,7 +79,7 @@ static bool is_format_supported(vk::PhysicalDevice physical_device, vk::Format f
 }
 
 ///////////////////////////////////////////////////////////
-Device::Device(const DeviceParams& params) : vkal_instance(params.vkal_instance) {
+Device::Device(const DeviceParams& params) : instance(params.instance) {
     this->select_physical_device(params);
     this->create_device(params);
     this->get_queues();
@@ -88,21 +88,21 @@ Device::Device(const DeviceParams& params) : vkal_instance(params.vkal_instance)
 
 ///////////////////////////////////////////////////////////
 Device::~Device() {
-    this->device.waitIdle();
-    for (auto command_pool : this->command_pools) {
-        this->device.destroyCommandPool(command_pool);
+    this->vk_device.waitIdle();
+    for (auto command_pool : this->vk_command_pools) {
+        this->vk_device.destroyCommandPool(command_pool);
     }
-    this->device.destroy();
+    this->vk_device.destroy();
 }
 
 ///////////////////////////////////////////////////////////
 vk::PhysicalDevice Device::get_physical() {
-    return this->physical_device;
+    return this->vk_physical_device;
 }
 
 ///////////////////////////////////////////////////////////
 vk::Device Device::get() {
-    return this->device;
+    return this->vk_device;
 }
 
 ///////////////////////////////////////////////////////////
@@ -123,13 +123,13 @@ uint32_t Device::get_queue_index(vk::QueueFlags queue_flags) {
 
 ///////////////////////////////////////////////////////////
 vk::Queue Device::get_queue(uint32_t index) {
-    return this->queues.at(index);
+    return this->vk_queues.at(index);
 }
 
 ///////////////////////////////////////////////////////////
 vk::Queue Device::get_present_queue(const vk::SurfaceKHR& surface) {
-    for (const auto& [index, queue] : std::ranges::views::enumerate(this->queues)) {
-        if (this->physical_device.getSurfaceSupportKHR(index, surface)) {
+    for (const auto& [index, queue] : std::ranges::views::enumerate(this->vk_queues)) {
+        if (this->vk_physical_device.getSurfaceSupportKHR(index, surface)) {
             return queue;
         }
     }
@@ -139,7 +139,7 @@ vk::Queue Device::get_present_queue(const vk::SurfaceKHR& surface) {
 
 ///////////////////////////////////////////////////////////
 vk::CommandPool Device::get_command_pool(uint32_t index) {
-    return this->command_pools.at(index);
+    return this->vk_command_pools.at(index);
 }
 
 ///////////////////////////////////////////////////////////
@@ -157,7 +157,7 @@ const std::vector<vk::Format>& Device::get_supported_depth_formats(vk::ImageTili
 ///////////////////////////////////////////////////////////
 void Device::select_physical_device(const DeviceParams& params) {
     std::vector<vk::PhysicalDevice> physical_devices =
-        this->vkal_instance.get().enumeratePhysicalDevices();
+        this->instance.get().enumeratePhysicalDevices();
 
     for (vk::PhysicalDevice physical_device : physical_devices) {
         vk::PhysicalDeviceProperties2 device_properties = physical_device.getProperties2();
@@ -166,12 +166,12 @@ void Device::select_physical_device(const DeviceParams& params) {
         if (is_device_suitable(available_extensions, device_properties.properties,
                                params.device_extensions)) {
             this->physical_device_properties = device_properties.properties;
-            this->physical_device = physical_device;
+            this->vk_physical_device = physical_device;
             break;
         }
     }
 
-    if (!this->physical_device) {
+    if (!this->vk_physical_device) {
         throw std::runtime_error("Failed to query any suitable device");
     }
 }
@@ -179,7 +179,7 @@ void Device::select_physical_device(const DeviceParams& params) {
 ///////////////////////////////////////////////////////////
 void Device::create_device(const DeviceParams& params) {
     std::vector<vk::QueueFamilyProperties2> queue_family_properties =
-        this->physical_device.getQueueFamilyProperties2();
+        this->vk_physical_device.getQueueFamilyProperties2();
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos(queue_family_properties.size());
     std::array<float, 1> queue_priorities = {0.5f};
     for (const auto& [index, queue_create_info] :
@@ -233,7 +233,7 @@ void Device::create_device(const DeviceParams& params) {
         .setQueueCreateInfos(queue_create_infos)
         .setPEnabledExtensionNames(enabled_extension_names);
 
-    this->device = this->physical_device.createDevice(device_create_info);
+    this->vk_device = this->vk_physical_device.createDevice(device_create_info);
 }
 
 ///////////////////////////////////////////////////////////
@@ -244,10 +244,10 @@ void Device::get_queues() {
     command_pool_create_info.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
     for (uint32_t i = 0; i < this->queue_properties.size(); ++i) {
         device_queue_info.setQueueFamilyIndex(i);
-        this->queues.push_back(this->device.getQueue2(device_queue_info));
+        this->vk_queues.push_back(this->vk_device.getQueue2(device_queue_info));
 
         command_pool_create_info.setQueueFamilyIndex(i);
-        this->command_pools.push_back(this->device.createCommandPool(command_pool_create_info));
+        this->vk_command_pools.push_back(this->vk_device.createCommandPool(command_pool_create_info));
     }
 }
 
@@ -259,11 +259,11 @@ void Device::query_depth_formats() {
     };
 
     for (vk::Format format : depth_formats) {
-        if (is_format_supported(this->physical_device, format, vk::ImageTiling::eLinear,
+        if (is_format_supported(this->vk_physical_device, format, vk::ImageTiling::eLinear,
                                 vk::FormatFeatureFlagBits::eDepthStencilAttachment)) {
             this->linear_depth_formats.push_back(format);
         }
-        if (is_format_supported(this->physical_device, format, vk::ImageTiling::eOptimal,
+        if (is_format_supported(this->vk_physical_device, format, vk::ImageTiling::eOptimal,
                                 vk::FormatFeatureFlagBits::eDepthStencilAttachment)) {
             this->optimal_depth_formats.push_back(format);
         }

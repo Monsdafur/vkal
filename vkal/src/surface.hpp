@@ -10,8 +10,8 @@ namespace vkal {
 
 struct SurfaceParams {
     SDL_Window* window;
-    Instance& vkal_instance;
-    Device& vkal_device;
+    Instance& instance;
+    Device& device;
     uint32_t image_count;
     vk::SurfaceFormatKHR surface_format;
     std::vector<vk::PresentModeKHR> present_modes;
@@ -60,19 +60,19 @@ class Surface {
     std::function<void(const vk::Extent2D&, const vk::Extent2D&)> resize_callback =
         [](const vk::Extent2D&, const vk::Extent2D&) {};
 
-    Instance& vkal_instance;
-    Device& vkal_device;
-    vk::SurfaceKHR surface;
-    vk::Queue present_queue;
+    Instance& instance;
+    Device& device;
+    vk::SurfaceKHR vk_surface;
+    vk::Queue vk_present_queue;
     vk::PhysicalDeviceSurfaceInfo2KHR surface_info;
     vk::SurfaceCapabilitiesKHR capabilities;
     vk::Extent2D current_extent;
     uint32_t image_count;
     vk::SurfaceFormatKHR surface_format;
     vk::PresentModeKHR present_mode;
-    vk::SwapchainKHR swapchain = nullptr;
+    vk::SwapchainKHR vk_swapchain = nullptr;
     std::vector<ImagePtr> images;
-    std::vector<vk::Semaphore> semaphores;
+    std::vector<vk::Semaphore> vk_semaphores;
 };
 
 using SurfacePtr = std::unique_ptr<Surface>;

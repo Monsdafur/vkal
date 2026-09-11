@@ -7,7 +7,7 @@
 namespace vkal {
 
 struct DescriptorLayoutParams {
-    Device& vkal_device;
+    Device& device;
     std::vector<vk::DescriptorSetLayoutBinding> bindings;
     std::vector<vk::DescriptorBindingFlags> binding_flags;
 };
@@ -29,9 +29,9 @@ class DescriptorLayout {
     const std::vector<vk::DescriptorSetLayoutBinding>& get_bindings() const;
 
   private:
-    Device& vkal_device;
+    Device& device;
     std::vector<vk::DescriptorSetLayoutBinding> bindings;
-    vk::DescriptorSetLayout layout;
+    vk::DescriptorSetLayout vk_layout;
 };
 
 using DescriptorLayoutPtr = std::unique_ptr<DescriptorLayout>;

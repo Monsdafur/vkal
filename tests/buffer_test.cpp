@@ -7,27 +7,27 @@
 namespace vkal {
 
 struct TestObjects {
-    InstancePtr vkal_instance;
-    DevicePtr vkal_device;
+    InstancePtr instance;
+    DevicePtr device;
     MemoryAllocatorPtr memory_allocator;
 };
 
 TestObjects create_test_objects() {
     SDL_Init(SDL_INIT_VIDEO);
 
-    InstancePtr vkal_instance = vkal::instance_ptr();
-    DevicePtr vkal_device = vkal::device_ptr(vkal::DeviceParams{
-        .vkal_instance = *vkal_instance,
+    InstancePtr instance = vkal::instance_ptr();
+    DevicePtr device = vkal::device_ptr(vkal::DeviceParams{
+        .instance = *instance,
         .device_extensions = {vk::KHRSwapchainExtensionName, vk::KHRSpirv14ExtensionName,
                               vk::KHRSynchronization2ExtensionName}});
     MemoryAllocatorPtr memory_allocator = vkal::memory_allocator_ptr(vkal::MemoryAllocatorParams{
-        .vkal_device = *vkal_device,
+        .device = *device,
         .block_size = 1024,
     });
 
     return TestObjects{
-        .vkal_instance = std::move(vkal_instance),
-        .vkal_device = std::move(vkal_device),
+        .instance = std::move(instance),
+        .device = std::move(device),
         .memory_allocator = std::move(memory_allocator),
     };
 }
@@ -39,7 +39,7 @@ TEST(BufferTest, MapData) {
     std::array<float, 4> output;
 
     BufferPtr b = buffer_ptr(BufferParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .memory_allocator = *o.memory_allocator,
         .size = sizeof(float) * input.size(),
         .usage = vk::BufferUsageFlagBits::eStorageBuffer,

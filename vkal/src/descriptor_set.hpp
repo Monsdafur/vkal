@@ -31,9 +31,9 @@ struct SamplerWriteParams {
 };
 
 struct DescriptorSetParams {
-    Device& vkal_device;
-    std::vector<std::reference_wrapper<DescriptorLayout>> vkal_layouts;
-    Descriptor& vkal_descriptor;
+    Device& device;
+    std::vector<std::reference_wrapper<DescriptorLayout>> layouts;
+    Descriptor& descriptor;
     bool enable_dynamic_sized_array = false;
     uint32_t dynamic_array_size = 1;
 };
@@ -61,11 +61,11 @@ class DescriptorSet {
     vk::DescriptorSet allocate_sets(bool enable_dynamic_sized_array, uint32_t array_size);
 
     // Members
-    Device& vkal_device;
-    std::vector<std::reference_wrapper<DescriptorLayout>> vkal_descriptor_layouts;
-    Descriptor& vkal_descriptor;
+    Device& device;
+    std::vector<std::reference_wrapper<DescriptorLayout>> descriptor_layouts;
+    Descriptor& descriptor;
     DescriptorPoolInfo pool_info;
-    std::vector<vk::DescriptorSet> sets;
+    std::vector<vk::DescriptorSet> vk_sets;
 };
 
 using DescriptorSetPtr = std::unique_ptr<DescriptorSet>;

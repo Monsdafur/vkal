@@ -9,34 +9,34 @@
 namespace vkal {
 
 struct TestObjects {
-    InstancePtr vkal_instance;
-    DevicePtr vkal_device;
+    InstancePtr instance;
+    DevicePtr device;
     MemoryAllocatorPtr memory_allocator;
 };
 
 TestObjects create_test_objects(vk::DeviceSize size = kilobytes(1)) {
     SDL_Init(SDL_INIT_VIDEO);
 
-    InstancePtr vkal_instance = vkal::instance_ptr();
-    DevicePtr vkal_device = vkal::device_ptr(vkal::DeviceParams{
-        .vkal_instance = *vkal_instance,
+    InstancePtr instance = vkal::instance_ptr();
+    DevicePtr device = vkal::device_ptr(vkal::DeviceParams{
+        .instance = *instance,
         .device_extensions = {vk::KHRSwapchainExtensionName, vk::KHRSpirv14ExtensionName,
                               vk::KHRSynchronization2ExtensionName}});
     MemoryAllocatorPtr memory_allocator = vkal::memory_allocator_ptr(vkal::MemoryAllocatorParams{
-        .vkal_device = *vkal_device,
+        .device = *device,
         .block_size = size,
     });
 
     return TestObjects{
-        .vkal_instance = std::move(vkal_instance),
-        .vkal_device = std::move(vkal_device),
+        .instance = std::move(instance),
+        .device = std::move(device),
         .memory_allocator = std::move(memory_allocator),
     };
 }
 
 BufferPtr create_buffer(vk::DeviceSize size, TestObjects* objects) {
     return buffer_ptr(BufferParams{
-        .vkal_device = *objects->vkal_device,
+        .device = *objects->device,
         .memory_allocator = *objects->memory_allocator,
         .size = size,
         .usage = vk::BufferUsageFlagBits::eTransferSrc,
@@ -48,7 +48,7 @@ TEST(MemoryBlockTest, CarvePerfectFit) {
     TestObjects o = create_test_objects();
     BufferPtr b = create_buffer(256, &o);
     MemoryBlock block = MemoryBlock(MemoryBlockParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .block_size = 1024,
         .properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         .memory_requirements = b->get_memory_requirements(),
@@ -71,7 +71,7 @@ TEST(MemoryBlockTest, CarveLeftFit) {
     TestObjects o = create_test_objects();
     BufferPtr b = create_buffer(256, &o);
     MemoryBlock block = MemoryBlock(MemoryBlockParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .block_size = 1024,
         .properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         .memory_requirements = b->get_memory_requirements(),
@@ -98,7 +98,7 @@ TEST(MemoryBlockTest, CarveRightFit) {
     TestObjects o = create_test_objects();
     BufferPtr b = create_buffer(256, &o);
     MemoryBlock block = MemoryBlock(MemoryBlockParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .block_size = 1024,
         .properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         .memory_requirements = b->get_memory_requirements(),
@@ -130,7 +130,7 @@ TEST(MemoryBlockTest, CarveMiddleFit) {
     TestObjects o = create_test_objects();
     BufferPtr b = create_buffer(256, &o);
     MemoryBlock block = MemoryBlock(MemoryBlockParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .block_size = 1024,
         .properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         .memory_requirements = b->get_memory_requirements(),
@@ -166,7 +166,7 @@ TEST(MemoryBlockTest, RemoveNoMerge) {
     TestObjects o = create_test_objects();
     BufferPtr b = create_buffer(256, &o);
     MemoryBlock block = MemoryBlock(MemoryBlockParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .block_size = 1024,
         .properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         .memory_requirements = b->get_memory_requirements(),
@@ -191,7 +191,7 @@ TEST(MemoryBlockTest, RemoveMergeRight) {
     TestObjects o = create_test_objects();
     BufferPtr b = create_buffer(256, &o);
     MemoryBlock block = MemoryBlock(MemoryBlockParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .block_size = 1024,
         .properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         .memory_requirements = b->get_memory_requirements(),
@@ -216,7 +216,7 @@ TEST(MemoryBlockTest, RemoveMergeLeft) {
     TestObjects o = create_test_objects();
     BufferPtr b = create_buffer(256, &o);
     MemoryBlock block = MemoryBlock(MemoryBlockParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .block_size = 1024,
         .properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         .memory_requirements = b->get_memory_requirements(),
@@ -246,7 +246,7 @@ TEST(MemoryBlockTest, RemoveMergeBoth) {
     TestObjects o = create_test_objects();
     BufferPtr b = create_buffer(256, &o);
     MemoryBlock block = MemoryBlock(MemoryBlockParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .block_size = 1024,
         .properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
         .memory_requirements = b->get_memory_requirements(),
@@ -311,7 +311,7 @@ TEST(MemoryAllocatorTest, AddBufferNewBlockOverflow) {
 TEST(MemoryAllocatorTest, AddBufferHostVisible) {
     TestObjects o = create_test_objects();
     BufferPtr b = buffer_ptr(BufferParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .memory_allocator = *o.memory_allocator,
         .size = 16,
         .usage = vk::BufferUsageFlagBits::eStorageBuffer,
@@ -328,14 +328,14 @@ TEST(MemoryAllocatorTest, AddBufferHostVisible) {
 TEST(MemoryAllocatorTest, AddBufferNewBlockIncompatibleType) {
     TestObjects o = create_test_objects();
     BufferPtr b0 = buffer_ptr(BufferParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .memory_allocator = *o.memory_allocator,
         .size = 40,
         .usage = vk::BufferUsageFlagBits::eStorageBuffer,
         .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
     });
     BufferPtr b1 = buffer_ptr(BufferParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .memory_allocator = *o.memory_allocator,
         .size = 16,
         .usage = vk::BufferUsageFlagBits::eStorageBuffer,
@@ -350,7 +350,7 @@ TEST(MemoryAllocatorTest, AddBufferNewBlockIncompatibleType) {
 TEST(MemoryAllocatorTest, RemoveBufferFreeBlock) {
     TestObjects o = create_test_objects();
     BufferPtr b0 = buffer_ptr(BufferParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .memory_allocator = *o.memory_allocator,
         .size = 40,
         .usage = vk::BufferUsageFlagBits::eStorageBuffer,
@@ -358,7 +358,7 @@ TEST(MemoryAllocatorTest, RemoveBufferFreeBlock) {
     });
     {
         BufferPtr b1 = buffer_ptr(BufferParams{
-            .vkal_device = *o.vkal_device,
+            .device = *o.device,
             .memory_allocator = *o.memory_allocator,
             .size = 16,
             .usage = vk::BufferUsageFlagBits::eStorageBuffer,
@@ -375,7 +375,7 @@ TEST(MemoryAllocatorTest, RemoveBufferFreeBlock) {
 TEST(MemoryAllocatorTest, AddImage) {
     TestObjects o = create_test_objects(megabytes(1));
     ImagePtr i = image_ptr(ImageParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .memory_allocator = *o.memory_allocator,
         .type = vk::ImageType::e2D,
         .extent = vk::Extent3D(32, 32, 1),
@@ -404,7 +404,7 @@ TEST(MemoryAllocatorTest, AddImage) {
 TEST(MemoryAllocatorTest, ImageFail) {
     TestObjects o = create_test_objects(megabytes(1));
     EXPECT_THROW(image_ptr(ImageParams{
-                     .vkal_device = *o.vkal_device,
+                     .device = *o.device,
                      .memory_allocator = *o.memory_allocator,
                      .type = vk::ImageType::e2D,
                      .extent = vk::Extent3D(1024, 1024, 1),

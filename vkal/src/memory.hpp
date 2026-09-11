@@ -17,7 +17,7 @@ struct MemoryChunk {
 };
 
 struct MemoryBlockParams {
-    Device& vkal_device;
+    Device& device;
     vk::DeviceSize block_size;
     vk::MemoryPropertyFlags properties;
     vk::MemoryRequirements memory_requirements;
@@ -61,11 +61,11 @@ class MemoryBlock {
     std::optional<std::reference_wrapper<MemoryChunk>>
     carve(MemoryChunk& chunk, vk::DeviceSize size, vk::DeviceSize alignment);
 
-    Device& vkal_device;
+    Device& device;
     vk::DeviceSize size;
     vk::MemoryPropertyFlags properties;
     uint32_t memory_type;
-    vk::DeviceMemory memory;
+    vk::DeviceMemory vk_memory;
     void* data;
 
     size_t chunk_count = 1;

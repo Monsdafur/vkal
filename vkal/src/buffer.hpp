@@ -7,7 +7,7 @@
 namespace vkal {
 
 struct BufferParams {
-    Device& vkal_device;
+    Device& device;
     MemoryAllocator& memory_allocator;
     vk::DeviceSize size;
     vk::BufferUsageFlags usage;
@@ -47,9 +47,9 @@ class Buffer {
 
     vk::MemoryRequirements get_requirements();
 
-    Device& vkal_device;
+    Device& device;
     vk::DeviceSize size;
-    vk::Buffer buffer;
+    vk::Buffer vk_buffer;
     vk::MemoryRequirements memory_requirements;
     MemoryAllocatorInfo allocator_info;
     void* data = nullptr;

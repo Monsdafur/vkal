@@ -7,7 +7,7 @@
 namespace vkal {
 
 struct SamplerParams {
-    Device& vkal_device;
+    Device& device;
     vk::SamplerAddressMode address_mode;
     vk::Filter filter = vk::Filter::eNearest;
     float mip_lod_bias = 0.0f;
@@ -33,8 +33,8 @@ class Sampler {
     vk::Sampler get();
 
   private:
-    Device& vkal_device;
-    vk::Sampler sampler;
+    Device& device;
+    vk::Sampler vk_sampler;
 };
 
 using SamplerPtr = std::unique_ptr<Sampler>;

@@ -33,27 +33,27 @@ int main() {
         }
 
         // Create device
-        vkal::InstancePtr vkal_instance = vkal::instance_ptr();
-        vkal::DevicePtr vkal_device = vkal::device_ptr(vkal::DeviceParams{
-            .vkal_instance = *vkal_instance,
+        vkal::InstancePtr instance = vkal::instance_ptr();
+        vkal::DevicePtr device = vkal::device_ptr(vkal::DeviceParams{
+            .instance = *instance,
             .device_extensions = {vk::KHRSwapchainExtensionName, vk::KHRSpirv14ExtensionName,
                                   vk::KHRSynchronization2ExtensionName}});
 
-        uint32_t queue_index = vkal_device->get_queue_index(vk::QueueFlagBits::eGraphics);
-        vkal::CommandPtr vkal_command = vkal::command_ptr(vkal::CommandParams{
-            .vkal_device = *vkal_device,
+        uint32_t queue_index = device->get_queue_index(vk::QueueFlagBits::eGraphics);
+        vkal::CommandPtr command = vkal::command_ptr(vkal::CommandParams{
+            .device = *device,
             .level = vk::CommandBufferLevel::ePrimary,
             .queue_index = queue_index,
             .command_count = 1,
         });
-        vk::Queue queue = vkal_device->get_queue(queue_index);
-        vk::CommandBuffer command = vkal_command->get(0);
+        vk::Queue vk_queue = device->get_queue(queue_index);
+        vk::CommandBuffer vk_command = command->get(0);
 
         // Create surface
-        vkal::SurfacePtr vkal_surface = vkal::surface_ptr(vkal::SurfaceParams{
+        vkal::SurfacePtr surface = vkal::surface_ptr(vkal::SurfaceParams{
             .window = window,
-            .vkal_instance = *vkal_instance,
-            .vkal_device = *vkal_device,
+            .instance = *instance,
+            .device = *device,
             .image_count = 3,
             .surface_format =
                 vk::SurfaceFormatKHR(vk::Format::eB8G8R8A8Srgb, vk::ColorSpaceKHR::eSrgbNonlinear),
@@ -68,13 +68,13 @@ int main() {
         // Create memory allocator
         vkal::MemoryAllocatorPtr memory_allocator =
             vkal::memory_allocator_ptr(vkal::MemoryAllocatorParams{
-                .vkal_device = *vkal_device,
+                .device = *device,
                 .block_size = vkal::megabytes(128),
             });
 
         // Craete descriptor
-        vkal::DescriptorPtr vkal_descriptor = vkal::descriptor_ptr(vkal::DescriptorParams{
-            .vkal_device = *vkal_device,
+        vkal::DescriptorPtr descriptor = vkal::descriptor_ptr(vkal::DescriptorParams{
+            .device = *device,
             .max_sets = 10,
             .pool_size = 10,
         });
@@ -82,14 +82,14 @@ int main() {
         // Create graphics resource manager
         vkal::RenderResourcesPtr render_resources =
             vkal::render_resources_ptr(vkal::RenderResourcesParams{
-                .vkal_device = *vkal_device,
+                .device = *device,
                 .memory_allocator = *memory_allocator,
             });
 
         // Load level data
         nlohmann::json json_data = load_level_from_path("resources/data/null.ldtk", "Level_0");
 
-        vkal_device->get().waitIdle();
+        device->get().waitIdle();
         SDL_Quit();
     } catch (const std::exception& e) {
         std::println("ERROR  | {}", e.what());

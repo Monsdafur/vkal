@@ -72,10 +72,10 @@ struct RenderPassDescription {
 };
 
 struct RenderGraphParams {
-    Device& vkal_device;
-    Surface& vkal_surface;
+    Device& device;
+    Surface& surface;
     RenderResources& render_resources;
-    Descriptor& vkal_descriptor;
+    Descriptor& descriptor;
 };
 
 struct GraphNode {
@@ -183,18 +183,18 @@ class RenderGraph {
   private:
     void generate_passes();
 
-    Device& vkal_device;
-    Surface& vkal_surface;
+    Device& device;
+    Surface& surface;
     RenderResources& render_resources;
-    Descriptor& vkal_descriptor;
+    Descriptor& descriptor;
 
     std::vector<RenderPassDescription> pass_descriptions;
     std::vector<size_t> pass_order;
     std::vector<std::unique_ptr<RenderPassData>> pass_data;
     std::vector<std::unique_ptr<RenderPass>> render_passes;
 
-    vk::Semaphore semaphore;
-    vk::Fence fence;
+    vk::Semaphore vk_semaphore;
+    vk::Fence vk_fence;
 };
 
 using RenderGraphPtr = std::unique_ptr<RenderGraph>;

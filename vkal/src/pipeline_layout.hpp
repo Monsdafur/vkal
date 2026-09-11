@@ -8,8 +8,8 @@
 namespace vkal {
 
 struct PipelineLayoutParams {
-    Device& vkal_device;
-    std::vector<std::reference_wrapper<DescriptorLayout>> vkal_descriptor_layouts;
+    Device& device;
+    std::vector<std::reference_wrapper<DescriptorLayout>> descriptor_layouts;
     std::vector<vk::PushConstantRange> push_constants;
 };
 
@@ -30,9 +30,9 @@ class PipelineLayout {
     std::vector<std::reference_wrapper<DescriptorLayout>>& get_descriptor_layouts();
 
   private:
-    Device& vkal_device;
-    std::vector<std::reference_wrapper<DescriptorLayout>> vkal_descriptor_layouts;
-    vk::PipelineLayout layout;
+    Device& device;
+    std::vector<std::reference_wrapper<DescriptorLayout>> descriptor_layouts;
+    vk::PipelineLayout vk_layout;
 };
 
 using PipelineLayoutPtr = std::unique_ptr<PipelineLayout>;

@@ -10,7 +10,7 @@
 namespace vkal {
 
 struct MemoryAllocatorParams {
-    Device& vkal_device;
+    Device& device;
     vk::DeviceSize block_size;
 };
 
@@ -46,7 +46,7 @@ class MemoryAllocator {
     MemoryAllocatorInfo query_block(vk::MemoryPropertyFlags memory_properties,
                                     const vk::MemoryRequirements& memory_requirements);
 
-    Device& vkal_device;
+    Device& device;
     vk::DeviceSize block_size;
     std::vector<MemoryBlockPtr> blocks;
 

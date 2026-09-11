@@ -10,20 +10,20 @@
 
 namespace vkal {
 
-struct Pool {
-    vk::DescriptorPool pool;
+struct DescriptorPoolData {
+    vk::DescriptorPool vk_descriptor_pool;
     uint32_t remaining_sets;
     std::vector<vk::DescriptorPoolSize> pool_sizes;
 };
 
 struct DescriptorPoolInfo {
-    Pool& pool;
+    DescriptorPoolData& descriptor_pool_data;
     std::vector<size_t> pool_size_indices;
     std::vector<vk::DescriptorPoolSize> pool_sizes;
 };
 
 struct DescriptorParams {
-    Device& vkal_device;
+    Device& device;
     uint32_t max_sets;
     uint32_t pool_size;
 };
@@ -43,15 +43,15 @@ class Descriptor {
     DescriptorPoolInfo
     get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>& layouts);
 
-    void clean(Pool& pool);
+    void clean(DescriptorPoolData& descriptor_pool_data);
 
     void dump();
 
   private:
-    Device& vkal_device;
+    Device& device;
     uint32_t max_sets;
     uint32_t pool_size;
-    std::vector<std::unique_ptr<Pool>> pools;
+    std::vector<std::unique_ptr<DescriptorPoolData>> descriptor_pool_datas;
 
     FRIEND_TEST(DescriptorTest, GetPool);
     FRIEND_TEST(DescriptorTest, GetPoolFail);

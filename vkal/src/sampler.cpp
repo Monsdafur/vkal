@@ -3,7 +3,7 @@
 namespace vkal {
 
 ///////////////////////////////////////////////////////////
-Sampler::Sampler(const SamplerParams& params) : vkal_device(params.vkal_device) {
+Sampler::Sampler(const SamplerParams& params) : device(params.device) {
     vk::SamplerCreateInfo sampler_create_info;
     sampler_create_info.setMagFilter(params.filter)
         .setMinFilter(params.filter)
@@ -18,17 +18,17 @@ Sampler::Sampler(const SamplerParams& params) : vkal_device(params.vkal_device) 
         .setMinLod(params.min_lod)
         .setMaxLod(params.max_lod);
 
-    this->sampler = this->vkal_device.get().createSampler(sampler_create_info);
+    this->vk_sampler = this->device.get().createSampler(sampler_create_info);
 }
 
 ///////////////////////////////////////////////////////////
 Sampler::~Sampler() {
-    this->vkal_device.get().destroySampler(this->sampler);
+    this->device.get().destroySampler(this->vk_sampler);
 }
 
 ///////////////////////////////////////////////////////////
 vk::Sampler Sampler::get() {
-    return this->sampler;
+    return this->vk_sampler;
 }
 
 } // namespace vkal

@@ -21,22 +21,22 @@ static uint32_t find_memory_type(vk::PhysicalDevice physical_device, uint32_t fi
 
 ///////////////////////////////////////////////////////////
 MemoryBlock::MemoryBlock(const MemoryBlockParams& params)
-    : vkal_device(params.vkal_device), size(params.block_size), properties(params.properties),
-      memory_type(find_memory_type(this->vkal_device.get_physical(),
+    : device(params.device), size(params.block_size), properties(params.properties),
+      memory_type(find_memory_type(this->device.get_physical(),
                                    params.memory_requirements.memoryTypeBits, this->properties)) {
 
     vk::MemoryAllocateInfo memory_allocate_info;
     memory_allocate_info.setAllocationSize(this->size).setMemoryTypeIndex(this->memory_type);
-    this->memory = this->vkal_device.get().allocateMemory(memory_allocate_info);
+    this->vk_memory = this->device.get().allocateMemory(memory_allocate_info);
 
     // Only map data when the host visible bits are active
     if ((properties & vk::MemoryPropertyFlagBits::eHostVisible) ==
         vk::MemoryPropertyFlagBits::eHostVisible) {
 #if defined(VULKAN_VERSION_1_4)
-        this->data = this->vkal_device.get().mapMemory2(
-            vk::MemoryMapInfo(vk::MemoryMapFlags(), this->memory, 0, this->size));
+        this->data = this->device.get().mapMemory2(
+            vk::MemoryMapInfo(vk::MemoryMapFlags(), this->vk_memory, 0, this->size));
 #else
-        this->data = this->vkal_device.get().mapMemory(this->memory, 0, this->size);
+        this->data = this->device.get().mapMemory(this->vk_memory, 0, this->size);
 #endif
     }
 
@@ -53,14 +53,13 @@ MemoryBlock::~MemoryBlock() {
         vk::MemoryPropertyFlagBits::eHostVisible) {
 
 #if defined(VULKAN_VERSION_1_4)
-        this->vkal_device.get().unmapMemory2(
-            vk::MemoryUnmapInfo(vk::MemoryUnmapFlags(), this->memory));
+        this->device.get().unmapMemory2(vk::MemoryUnmapInfo(vk::MemoryUnmapFlags(), this->vk_memory));
 #else
-        this->vkal_device.get().unmapMemory(this->memory);
+        this->device.get().unmapMemory(this->vk_memory);
 #endif
     }
 
-    this->vkal_device.get().freeMemory(this->memory);
+    this->device.get().freeMemory(this->vk_memory);
 }
 
 ///////////////////////////////////////////////////////////
@@ -89,8 +88,8 @@ void MemoryBlock::flush() {
     bool is_coherent = (this->properties & vk::MemoryPropertyFlagBits::eHostCoherent) ==
                        vk::MemoryPropertyFlagBits::eHostCoherent;
     if (is_visible && !is_coherent) {
-        this->vkal_device.get().flushMappedMemoryRanges(
-            vk::MappedMemoryRange(this->memory, 0, this->size));
+        this->device.get().flushMappedMemoryRanges(
+            vk::MappedMemoryRange(this->vk_memory, 0, this->size));
     }
 }
 

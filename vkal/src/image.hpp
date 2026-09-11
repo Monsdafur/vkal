@@ -7,7 +7,7 @@
 namespace vkal {
 
 struct ImageParams {
-    Device& vkal_device;
+    Device& device;
     MemoryAllocator& memory_allocator;
     vk::ImageType type = vk::ImageType::e2D;
     vk::ImageViewType view_type = vk::ImageViewType::e2D;
@@ -21,7 +21,7 @@ struct ImageParams {
 };
 
 struct SwapchainImageParams {
-    Device& vkal_device;
+    Device& device;
     vk::Image image;
     vk::Extent2D extent;
     vk::Format format;
@@ -70,7 +70,7 @@ class Image {
 
     vk::ImageView create_view();
 
-    Device& vkal_device;
+    Device& device;
     bool is_swapchain_owned;
 
     vk::ImageType type;
@@ -80,10 +80,10 @@ class Image {
     vk::ImageAspectFlags aspects;
     uint32_t mip_levels;
 
-    vk::Image image;
+    vk::Image vk_image;
     vk::MemoryRequirements memory_requirements;
     std::optional<MemoryAllocatorInfo> allocator_info;
-    vk::ImageView view;
+    vk::ImageView vk_view;
     std::vector<vk::AccessFlags2> accesses;
     std::vector<vk::PipelineStageFlags2> stages;
     std::vector<vk::ImageLayout> layouts;

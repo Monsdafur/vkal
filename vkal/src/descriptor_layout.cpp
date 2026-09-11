@@ -4,7 +4,7 @@ namespace vkal {
 
 ///////////////////////////////////////////////////////////
 DescriptorLayout::DescriptorLayout(const DescriptorLayoutParams& params)
-    : vkal_device(params.vkal_device), bindings(params.bindings) {
+    : device(params.device), bindings(params.bindings) {
     vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_create_info;
     vk::DescriptorSetLayoutBindingFlagsCreateInfo binding_flags;
     if (!params.binding_flags.empty()) {
@@ -13,18 +13,18 @@ DescriptorLayout::DescriptorLayout(const DescriptorLayoutParams& params)
     }
     descriptor_set_layout_create_info.setBindings(this->bindings);
 
-    this->layout =
-        this->vkal_device.get().createDescriptorSetLayout(descriptor_set_layout_create_info);
+    this->vk_layout =
+        this->device.get().createDescriptorSetLayout(descriptor_set_layout_create_info);
 }
 
 ///////////////////////////////////////////////////////////
 DescriptorLayout::~DescriptorLayout() {
-    this->vkal_device.get().destroyDescriptorSetLayout(this->layout);
+    this->device.get().destroyDescriptorSetLayout(this->vk_layout);
 }
 
 ///////////////////////////////////////////////////////////
 vk::DescriptorSetLayout DescriptorLayout::get() {
-    return this->layout;
+    return this->vk_layout;
 }
 
 ///////////////////////////////////////////////////////////

@@ -7,21 +7,21 @@
 namespace vkal {
 
 struct TestObjects {
-    InstancePtr vkal_instance;
-    DevicePtr vkal_device;
+    InstancePtr instance;
+    DevicePtr device;
 };
 
 TestObjects create_test_objects() {
     SDL_Init(SDL_INIT_VIDEO);
 
-    InstancePtr vkal_instance = instance_ptr();
-    DevicePtr vkal_device = device_ptr(vkal::DeviceParams{
-        .vkal_instance = *vkal_instance,
+    InstancePtr instance = instance_ptr();
+    DevicePtr device = device_ptr(vkal::DeviceParams{
+        .instance = *instance,
         .device_extensions = {vk::KHRSwapchainExtensionName, vk::KHRSpirv14ExtensionName,
                               vk::KHRSynchronization2ExtensionName}});
     return TestObjects{
-        .vkal_instance = std::move(vkal_instance),
-        .vkal_device = std::move(vkal_device),
+        .instance = std::move(instance),
+        .device = std::move(device),
     };
 }
 
@@ -29,14 +29,14 @@ TEST(DescriptorTest, CollectPoolSize) {
     TestObjects o = create_test_objects();
 
     DescriptorLayoutPtr l0 = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1),
             vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eUniformBuffer, 1),
             vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageBuffer, 2),
         }});
     DescriptorLayoutPtr l1 = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1),
             vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eSampledImage, 16),
@@ -99,7 +99,7 @@ TEST(DescriptorTest, GetPool) {
     TestObjects o = create_test_objects();
 
     DescriptorLayoutPtr l = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1),
             vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eUniformBuffer, 1),
@@ -107,25 +107,25 @@ TEST(DescriptorTest, GetPool) {
         }});
 
     DescriptorPtr ds = descriptor_ptr(DescriptorParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .max_sets = 10,
         .pool_size = 10,
     });
 
     DescriptorPoolInfo pi = ds->get_pool({*l});
 
-    ASSERT_EQ(ds->pools.size(), 1);
+    ASSERT_EQ(ds->descriptor_pool_datas.size(), 1);
 
-    ASSERT_EQ(pi.pool.remaining_sets, 9);
+    ASSERT_EQ(pi.descriptor_pool_data.remaining_sets, 9);
     ASSERT_EQ(pi.pool_size_indices.size(), 2);
     ASSERT_EQ(pi.pool_size_indices[0], 0);
     ASSERT_EQ(pi.pool_size_indices[1], 1);
 
-    ASSERT_EQ(pi.pool.pool_sizes[0].type, vk::DescriptorType::eUniformBuffer);
-    ASSERT_EQ(pi.pool.pool_sizes[0].descriptorCount, 8);
+    ASSERT_EQ(pi.descriptor_pool_data.pool_sizes[0].type, vk::DescriptorType::eUniformBuffer);
+    ASSERT_EQ(pi.descriptor_pool_data.pool_sizes[0].descriptorCount, 8);
 
-    ASSERT_EQ(pi.pool.pool_sizes[1].type, vk::DescriptorType::eStorageBuffer);
-    ASSERT_EQ(pi.pool.pool_sizes[1].descriptorCount, 9);
+    ASSERT_EQ(pi.descriptor_pool_data.pool_sizes[1].type, vk::DescriptorType::eStorageBuffer);
+    ASSERT_EQ(pi.descriptor_pool_data.pool_sizes[1].descriptorCount, 9);
 
     SDL_Quit();
 }
@@ -134,13 +134,13 @@ TEST(DescriptorTest, GetPoolFail) {
     TestObjects o = create_test_objects();
 
     DescriptorLayoutPtr l = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageImage, 11),
         }});
 
     DescriptorPtr ds = descriptor_ptr(DescriptorParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .max_sets = 10,
         .pool_size = 10,
     });
@@ -154,20 +154,20 @@ TEST(DescriptorTest, GetMultiplePools) {
     TestObjects o = create_test_objects();
 
     DescriptorLayoutPtr l0 = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1),
             vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eUniformBuffer, 1),
             vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageImage, 1),
         }});
     DescriptorLayoutPtr l1 = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageImage, 2),
         }});
 
     DescriptorPtr ds = descriptor_ptr(DescriptorParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .max_sets = 10,
         .pool_size = 10,
     });
@@ -175,16 +175,18 @@ TEST(DescriptorTest, GetMultiplePools) {
     DescriptorPoolInfo pi0 = ds->get_pool({*l0});
     DescriptorPoolInfo pi1 = ds->get_pool({*l1});
 
-    ASSERT_EQ(ds->pools.back()->remaining_sets, 8);
+    ASSERT_EQ(ds->descriptor_pool_datas.back()->remaining_sets, 8);
 
-    ASSERT_EQ(ds->pools.size(), 1);
-    ASSERT_EQ(ds->pools.back()->pool_sizes.size(), 2);
+    ASSERT_EQ(ds->descriptor_pool_datas.size(), 1);
+    ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes.size(), 2);
 
-    ASSERT_EQ(ds->pools.back()->pool_sizes[0].type, vk::DescriptorType::eUniformBuffer);
-    ASSERT_EQ(ds->pools.back()->pool_sizes[0].descriptorCount, 8);
+    ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes[0].type,
+              vk::DescriptorType::eUniformBuffer);
+    ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes[0].descriptorCount, 8);
 
-    ASSERT_EQ(ds->pools.back()->pool_sizes[1].type, vk::DescriptorType::eStorageImage);
-    ASSERT_EQ(ds->pools.back()->pool_sizes[1].descriptorCount, 7);
+    ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes[1].type,
+              vk::DescriptorType::eStorageImage);
+    ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes[1].descriptorCount, 7);
 
     // Checking pool infos
     ASSERT_EQ(pi0.pool_size_indices.size(), 2);
@@ -201,14 +203,14 @@ TEST(DescriptorTest, GetMultipleUnfit) {
     TestObjects o = create_test_objects();
 
     DescriptorLayoutPtr l0 = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1),
             vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eUniformBuffer, 1),
             vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eStorageImage, 2),
         }});
     DescriptorLayoutPtr l1 = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1),
             vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageBuffer, 1),
@@ -217,7 +219,7 @@ TEST(DescriptorTest, GetMultipleUnfit) {
         }});
 
     DescriptorPtr ds = descriptor_ptr(DescriptorParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .max_sets = 10,
         .pool_size = 10,
     });
@@ -225,31 +227,31 @@ TEST(DescriptorTest, GetMultipleUnfit) {
     DescriptorPoolInfo pi0 = ds->get_pool({*l0});
     DescriptorPoolInfo pi1 = ds->get_pool({*l1});
 
-    ASSERT_EQ(ds->pools.size(), 2);
+    ASSERT_EQ(ds->descriptor_pool_datas.size(), 2);
 
     // Pool 0
-    ASSERT_EQ(ds->pools[0]->remaining_sets, 9);
+    ASSERT_EQ(ds->descriptor_pool_datas[0]->remaining_sets, 9);
 
-    ASSERT_EQ(ds->pools[0]->pool_sizes[0].type, vk::DescriptorType::eUniformBuffer);
-    ASSERT_EQ(ds->pools[0]->pool_sizes[0].descriptorCount, 8);
+    ASSERT_EQ(ds->descriptor_pool_datas[0]->pool_sizes[0].type, vk::DescriptorType::eUniformBuffer);
+    ASSERT_EQ(ds->descriptor_pool_datas[0]->pool_sizes[0].descriptorCount, 8);
 
-    ASSERT_EQ(ds->pools[0]->pool_sizes[1].type, vk::DescriptorType::eStorageImage);
-    ASSERT_EQ(ds->pools[0]->pool_sizes[1].descriptorCount, 8);
+    ASSERT_EQ(ds->descriptor_pool_datas[0]->pool_sizes[1].type, vk::DescriptorType::eStorageImage);
+    ASSERT_EQ(ds->descriptor_pool_datas[0]->pool_sizes[1].descriptorCount, 8);
 
     // Pool 1
-    ASSERT_EQ(ds->pools[1]->remaining_sets, 9);
+    ASSERT_EQ(ds->descriptor_pool_datas[1]->remaining_sets, 9);
 
-    ASSERT_EQ(ds->pools[1]->pool_sizes[0].type, vk::DescriptorType::eUniformBuffer);
-    ASSERT_EQ(ds->pools[1]->pool_sizes[0].descriptorCount, 9);
+    ASSERT_EQ(ds->descriptor_pool_datas[1]->pool_sizes[0].type, vk::DescriptorType::eUniformBuffer);
+    ASSERT_EQ(ds->descriptor_pool_datas[1]->pool_sizes[0].descriptorCount, 9);
 
-    ASSERT_EQ(ds->pools[1]->pool_sizes[1].type, vk::DescriptorType::eStorageBuffer);
-    ASSERT_EQ(ds->pools[1]->pool_sizes[1].descriptorCount, 9);
+    ASSERT_EQ(ds->descriptor_pool_datas[1]->pool_sizes[1].type, vk::DescriptorType::eStorageBuffer);
+    ASSERT_EQ(ds->descriptor_pool_datas[1]->pool_sizes[1].descriptorCount, 9);
 
-    ASSERT_EQ(ds->pools[1]->pool_sizes[2].type, vk::DescriptorType::eSampler);
-    ASSERT_EQ(ds->pools[1]->pool_sizes[2].descriptorCount, 9);
+    ASSERT_EQ(ds->descriptor_pool_datas[1]->pool_sizes[2].type, vk::DescriptorType::eSampler);
+    ASSERT_EQ(ds->descriptor_pool_datas[1]->pool_sizes[2].descriptorCount, 9);
 
-    ASSERT_EQ(ds->pools[1]->pool_sizes[3].type, vk::DescriptorType::eSampledImage);
-    ASSERT_EQ(ds->pools[1]->pool_sizes[3].descriptorCount, 6);
+    ASSERT_EQ(ds->descriptor_pool_datas[1]->pool_sizes[3].type, vk::DescriptorType::eSampledImage);
+    ASSERT_EQ(ds->descriptor_pool_datas[1]->pool_sizes[3].descriptorCount, 6);
 
     // Checking pool infos
     ASSERT_EQ(pi0.pool_size_indices.size(), 2);
@@ -269,32 +271,33 @@ TEST(DescriptorTest, FreeSet) {
     TestObjects o = create_test_objects();
 
     DescriptorLayoutPtr l = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageImage, 4),
         }});
 
     DescriptorPtr ds = descriptor_ptr(DescriptorParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .max_sets = 10,
         .pool_size = 10,
     });
 
     {
         DescriptorSetPtr dcs = descriptor_set_ptr(DescriptorSetParams{
-            .vkal_device = *o.vkal_device,
-            .vkal_layouts = {*l},
-            .vkal_descriptor = *ds,
+            .device = *o.device,
+            .layouts = {*l},
+            .descriptor = *ds,
         });
 
-        ASSERT_EQ(ds->pools.size(), 1);
-        ASSERT_EQ(ds->pools.back()->pool_sizes.size(), 1);
+        ASSERT_EQ(ds->descriptor_pool_datas.size(), 1);
+        ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes.size(), 1);
 
-        ASSERT_EQ(ds->pools.back()->pool_sizes[0].type, vk::DescriptorType::eStorageImage);
-        ASSERT_EQ(ds->pools.back()->pool_sizes[0].descriptorCount, 6);
+        ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes[0].type,
+                  vk::DescriptorType::eStorageImage);
+        ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes[0].descriptorCount, 6);
     }
 
-    ASSERT_EQ(ds->pools.size(), 0);
+    ASSERT_EQ(ds->descriptor_pool_datas.size(), 0);
 
     SDL_Quit();
 }
@@ -303,39 +306,40 @@ TEST(DescriptorTest, FreeSetSharedPool) {
     TestObjects o = create_test_objects();
 
     DescriptorLayoutPtr l = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eSampler, 1),
             vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageImage, 4),
         }});
 
     DescriptorPtr ds = descriptor_ptr(DescriptorParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .max_sets = 10,
         .pool_size = 10,
     });
 
     DescriptorSetPtr dcs0 = descriptor_set_ptr(DescriptorSetParams{
-        .vkal_device = *o.vkal_device,
-        .vkal_layouts = {*l},
-        .vkal_descriptor = *ds,
+        .device = *o.device,
+        .layouts = {*l},
+        .descriptor = *ds,
     });
     {
         DescriptorSetPtr dcs1 = descriptor_set_ptr(DescriptorSetParams{
-            .vkal_device = *o.vkal_device,
-            .vkal_layouts = {*l},
-            .vkal_descriptor = *ds,
+            .device = *o.device,
+            .layouts = {*l},
+            .descriptor = *ds,
         });
     }
 
-    ASSERT_EQ(ds->pools.size(), 1);
-    ASSERT_EQ(ds->pools.back()->pool_sizes.size(), 2);
+    ASSERT_EQ(ds->descriptor_pool_datas.size(), 1);
+    ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes.size(), 2);
 
-    ASSERT_EQ(ds->pools.back()->pool_sizes[0].type, vk::DescriptorType::eSampler);
-    ASSERT_EQ(ds->pools.back()->pool_sizes[0].descriptorCount, 9);
+    ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes[0].type, vk::DescriptorType::eSampler);
+    ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes[0].descriptorCount, 9);
 
-    ASSERT_EQ(ds->pools.back()->pool_sizes[1].type, vk::DescriptorType::eStorageImage);
-    ASSERT_EQ(ds->pools.back()->pool_sizes[1].descriptorCount, 6);
+    ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes[1].type,
+              vk::DescriptorType::eStorageImage);
+    ASSERT_EQ(ds->descriptor_pool_datas.back()->pool_sizes[1].descriptorCount, 6);
 
     SDL_Quit();
 }
@@ -344,36 +348,36 @@ TEST(DescriptorTest, FreeSetSeparatePool) {
     TestObjects o = create_test_objects();
 
     DescriptorLayoutPtr l0 = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1),
         }});
     DescriptorLayoutPtr l1 = descriptor_layout_ptr(DescriptorLayoutParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .bindings = {
             vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eStorageBuffer, 4),
         }});
 
     DescriptorPtr ds = descriptor_ptr(DescriptorParams{
-        .vkal_device = *o.vkal_device,
+        .device = *o.device,
         .max_sets = 10,
         .pool_size = 10,
     });
 
     DescriptorSetPtr dcs0 = descriptor_set_ptr(DescriptorSetParams{
-        .vkal_device = *o.vkal_device,
-        .vkal_layouts = {*l0},
-        .vkal_descriptor = *ds,
+        .device = *o.device,
+        .layouts = {*l0},
+        .descriptor = *ds,
     });
     {
         DescriptorSetPtr dcs1 = descriptor_set_ptr(DescriptorSetParams{
-            .vkal_device = *o.vkal_device,
-            .vkal_layouts = {*l1},
-            .vkal_descriptor = *ds,
+            .device = *o.device,
+            .layouts = {*l1},
+            .descriptor = *ds,
         });
     }
 
-    ASSERT_EQ(ds->pools.size(), 1);
+    ASSERT_EQ(ds->descriptor_pool_datas.size(), 1);
 
     SDL_Quit();
 }

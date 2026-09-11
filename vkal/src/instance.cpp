@@ -41,14 +41,14 @@ Instance::Instance() {
 ///////////////////////////////////////////////////////////
 Instance::~Instance() {
 #if defined(ENABLE_VALIDATION)
-    this->instance.destroyDebugUtilsMessengerEXT(this->debugger);
+    this->vk_instance.destroyDebugUtilsMessengerEXT(this->vk_debugger);
 #endif
-    this->instance.destroy();
+    this->vk_instance.destroy();
 }
 
 ///////////////////////////////////////////////////////////
 vk::Instance Instance::get() {
-    return this->instance;
+    return this->vk_instance;
 }
 
 ///////////////////////////////////////////////////////////
@@ -123,8 +123,8 @@ void Instance::create_instance() {
             .setPApplicationInfo(&app_info)
             .setPEnabledExtensionNames(required_extensions)
             .setPEnabledLayerNames(required_layers);
-    this->instance = vk::createInstance(instance_create_info);
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(this->instance);
+    this->vk_instance = vk::createInstance(instance_create_info);
+    VULKAN_HPP_DEFAULT_DISPATCHER.init(this->vk_instance);
 }
 
 ///////////////////////////////////////////////////////////
@@ -137,7 +137,7 @@ void Instance::create_message_debugger() {
                         vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
                         vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation)
         .setPfnUserCallback(debug_callback);
-    this->debugger = this->instance.createDebugUtilsMessengerEXT(debugger_create_info);
+    this->vk_debugger = this->vk_instance.createDebugUtilsMessengerEXT(debugger_create_info);
 }
 
 } // namespace vkal

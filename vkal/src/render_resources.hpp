@@ -79,7 +79,7 @@ struct SamplerResourceParams {
 };
 
 struct RenderResourcesParams {
-    Device& vkal_device;
+    Device& device;
     MemoryAllocator& memory_allocator;
 };
 
@@ -122,7 +122,7 @@ class RenderResources {
     Pipeline& get_pipeline(const std::string& identifier);
 
   private:
-    Device& vkal_device;
+    Device& device;
     MemoryAllocator& memory_allocator;
 
     std::map<std::string, DescriptorLayoutPtr> descriptor_layouts;

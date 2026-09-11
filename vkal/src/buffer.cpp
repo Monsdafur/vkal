@@ -4,16 +4,16 @@ namespace vkal {
 
 ///////////////////////////////////////////////////////////
 Buffer::Buffer(const BufferParams& params)
-    : vkal_device(params.vkal_device), size(params.size), buffer(this->create_buffer(params)),
+    : device(params.device), size(params.size), vk_buffer(this->create_buffer(params)),
       memory_requirements(this->get_requirements()),
-      allocator_info(params.memory_allocator.bind_buffer(this->buffer, params.memory_properties,
+      allocator_info(params.memory_allocator.bind_buffer(this->vk_buffer, params.memory_properties,
                                                          this->memory_requirements)) {
     this->allocator_info.block.map_data(this->allocator_info.chunk, &this->data);
 }
 
 ///////////////////////////////////////////////////////////
 Buffer::~Buffer() {
-    this->vkal_device.get().destroyBuffer(this->buffer);
+    this->device.get().destroyBuffer(this->vk_buffer);
 
     // Sync with memory allocator data
     this->allocator_info.block.remove_chunk(this->allocator_info.chunk);
@@ -25,7 +25,7 @@ Buffer::~Buffer() {
 
 ///////////////////////////////////////////////////////////
 vk::Buffer Buffer::get() {
-    return this->buffer;
+    return this->vk_buffer;
 }
 
 ///////////////////////////////////////////////////////////
@@ -70,14 +70,14 @@ vk::Buffer Buffer::create_buffer(const BufferParams& params) {
         .setUsage(params.usage)
         .setSharingMode(vk::SharingMode::eExclusive);
 
-    return this->vkal_device.get().createBuffer(buffer_create_info);
+    return this->device.get().createBuffer(buffer_create_info);
 }
 
 ///////////////////////////////////////////////////////////
 vk::MemoryRequirements Buffer::get_requirements() {
     vk::BufferMemoryRequirementsInfo2 memory_requirements_info;
-    memory_requirements_info.setBuffer(this->buffer);
-    return this->vkal_device.get()
+    memory_requirements_info.setBuffer(this->vk_buffer);
+    return this->device.get()
         .getBufferMemoryRequirements2(memory_requirements_info)
         .memoryRequirements;
 }

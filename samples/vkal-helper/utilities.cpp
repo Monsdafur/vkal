@@ -19,7 +19,7 @@ vkal::Buffer& add_device_local_buffer(vk::Queue queue, vk::CommandBuffer command
     });
 
     vkal::BufferPtr staging = vkal::buffer_ptr(vkal::BufferParams{
-        .vkal_device = device,
+        .device = device,
         .memory_allocator = render_resources.get_memory_allocator(),
         .size = size,
         .usage = vk::BufferUsageFlagBits::eTransferSrc,
@@ -206,7 +206,7 @@ load_images(vk::Queue queue, vk::CommandBuffer command, vkal::Device& device,
         // Create staging buffers
         vk::DeviceSize base_size(surface->w * surface->h * 4);
         stagings.push_back(std::move(vkal::buffer_ptr(vkal::BufferParams{
-            .vkal_device = device,
+            .device = device,
             .memory_allocator = render_resources.get_memory_allocator(),
             .size = base_size,
             .usage = vk::BufferUsageFlagBits::eTransferSrc,

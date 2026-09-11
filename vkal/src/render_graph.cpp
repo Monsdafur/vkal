@@ -192,17 +192,17 @@ std::vector<size_t> topology_sort(std::vector<std::pair<GraphNode, size_t>>& nod
 
 ///////////////////////////////////////////////////////////
 RenderGraph::RenderGraph(const RenderGraphParams& params)
-    : vkal_device(params.vkal_device), vkal_surface(params.vkal_surface),
-      render_resources(params.render_resources), vkal_descriptor(params.vkal_descriptor) {
+    : device(params.device), surface(params.surface), render_resources(params.render_resources),
+      descriptor(params.descriptor) {
 
-    this->semaphore = this->vkal_device.get().createSemaphore(vk::SemaphoreCreateInfo());
-    this->fence = this->vkal_device.get().createFence(
+    this->vk_semaphore = this->device.get().createSemaphore(vk::SemaphoreCreateInfo());
+    this->vk_fence = this->device.get().createFence(
         vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
 }
 
 RenderGraph::~RenderGraph() {
-    this->vkal_device.get().destroySemaphore(this->semaphore);
-    this->vkal_device.get().destroyFence(this->fence);
+    this->device.get().destroySemaphore(this->vk_semaphore);
+    this->device.get().destroyFence(this->vk_fence);
 }
 
 ///////////////////////////////////////////////////////////
@@ -243,9 +243,9 @@ void RenderGraph::generate_passes() {
             }
 
             DescriptorSetParams set_params = {
-                .vkal_device = this->vkal_device,
-                .vkal_layouts = set_layouts,
-                .vkal_descriptor = this->vkal_descriptor,
+                .device = this->device,
+                .layouts = set_layouts,
+                .descriptor = this->descriptor,
             };
             if (max_array_size > 1) {
                 set_params.enable_dynamic_sized_array = true;
@@ -375,8 +375,8 @@ void RenderGraph::generate_passes() {
                 if (attachment_description.type == RenderAttachmentType::SWAPCHAIN) {
                     pass->write_swapchain = true;
                     vk::Extent3D swapchain_extent(
-                        this->vkal_surface.get_capabilities().currentExtent.width,
-                        this->vkal_surface.get_capabilities().currentExtent.height, 1);
+                        this->surface.get_capabilities().currentExtent.width,
+                        this->surface.get_capabilities().currentExtent.height, 1);
                     if (attachment_extent.width == 0) {
                         attachment_extent = swapchain_extent;
                     } else if (attachment_extent != swapchain_extent) {
@@ -430,7 +430,7 @@ void RenderGraph::generate_passes() {
 
 ///////////////////////////////////////////////////////////
 void RenderGraph::sync() {
-    vk::Result result = this->vkal_device.get().waitForFences(this->fence, true, UINT64_MAX);
+    vk::Result result = this->device.get().waitForFences(this->vk_fence, true, UINT64_MAX);
     if (result != vk::Result::eSuccess) {
         throw std::runtime_error(
             std::format("Failed to wait for fences due to {}", vk::to_string(result)));
@@ -440,11 +440,11 @@ void RenderGraph::sync() {
 ///////////////////////////////////////////////////////////
 void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::CommandBuffer command,
                           vk::Semaphore semaphore) {
-    this->vkal_device.get().resetFences(this->fence);
+    this->device.get().resetFences(this->vk_fence);
     command.reset();
     command.begin(vk::CommandBufferBeginInfo());
 
-    Image& swapchain_image = this->vkal_surface.get_image(swapchain_index);
+    Image& swapchain_image = this->surface.get_image(swapchain_index);
 
     for (std::unique_ptr<RenderPassData>& pass : this->pass_data) {
         pass->render_attachment_infos.clear();
@@ -596,14 +596,14 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
         vk::PipelineStageFlagBits2::eColorAttachmentOutput);
 
     vk::SemaphoreSubmitInfo wait_semaphore_info;
-    wait_semaphore_info.setSemaphore(this->semaphore)
+    wait_semaphore_info.setSemaphore(this->vk_semaphore)
         .setStageMask(vk::PipelineStageFlagBits2::eAllCommands);
 
     vk::SubmitInfo2 submit_info;
     submit_info.setCommandBufferInfos(command_submit_info)
         .setSignalSemaphoreInfos(signal_semaphore_info)
         .setWaitSemaphoreInfos(wait_semaphore_info);
-    queue.submit2(submit_info, this->fence);
+    queue.submit2(submit_info, this->vk_fence);
 }
 
 ///////////////////////////////////////////////////////////
@@ -615,7 +615,7 @@ void RenderGraph::rebind_resources() {
 
 ///////////////////////////////////////////////////////////
 vk::Semaphore RenderGraph::get_semaphore() {
-    return this->semaphore;
+    return this->vk_semaphore;
 }
 
 } // namespace vkal

@@ -53,13 +53,13 @@ match_descriptor_pool_sizes(const std::vector<vk::DescriptorPoolSize>& layout_po
 
 ///////////////////////////////////////////////////////////
 Descriptor::Descriptor(const DescriptorParams& params)
-    : vkal_device(params.vkal_device), max_sets(params.max_sets), pool_size(params.pool_size) {
+    : device(params.device), max_sets(params.max_sets), pool_size(params.pool_size) {
 }
 
 ///////////////////////////////////////////////////////////
 Descriptor::~Descriptor() {
-    for (const auto& pool : this->pools) {
-        this->vkal_device.get().destroyDescriptorPool(pool->pool);
+    for (const auto& pool : this->descriptor_pool_datas) {
+        this->device.get().destroyDescriptorPool(pool->vk_descriptor_pool);
     }
 }
 
@@ -69,22 +69,24 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
     // Collect all descriptor pool sizes
     std::vector<vk::DescriptorPoolSize> layout_pool_sizes = collect_descriptor_pool_sizes(layouts);
 
-    for (const auto& pool : this->pools) {
+    for (const std::unique_ptr<DescriptorPoolData>& descriptor_pool_data :
+         this->descriptor_pool_datas) {
         std::vector<size_t> pool_indices =
-            match_descriptor_pool_sizes(layout_pool_sizes, pool->pool_sizes);
-        if (pool_indices.size() != layout_pool_sizes.size() || pool->remaining_sets == 0) {
+            match_descriptor_pool_sizes(layout_pool_sizes, descriptor_pool_data->pool_sizes);
+        if (pool_indices.size() != layout_pool_sizes.size() ||
+            descriptor_pool_data->remaining_sets == 0) {
             continue;
         }
 
         // If a matching descriptor pool is found decrease each pool size
         for (size_t i = 0; i < layout_pool_sizes.size(); ++i) {
-            pool->pool_sizes[pool_indices[i]].descriptorCount -=
+            descriptor_pool_data->pool_sizes[pool_indices[i]].descriptorCount -=
                 layout_pool_sizes[i].descriptorCount;
         }
-        pool->remaining_sets--;
+        descriptor_pool_data->remaining_sets--;
 
         return DescriptorPoolInfo{
-            .pool = *pool,
+            .descriptor_pool_data = *descriptor_pool_data,
             .pool_size_indices = pool_indices,
             .pool_sizes = layout_pool_sizes,
         };
@@ -113,9 +115,9 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
         .setPoolSizes(current_pool_sizes);
 
     vk::DescriptorPool descriptor_pool =
-        this->vkal_device.get().createDescriptorPool(descriptor_pool_create_info);
-    this->pools.push_back(std::make_unique<Pool>(Pool{
-        .pool = descriptor_pool,
+        this->device.get().createDescriptorPool(descriptor_pool_create_info);
+    this->descriptor_pool_datas.push_back(std::make_unique<DescriptorPoolData>(DescriptorPoolData{
+        .vk_descriptor_pool = descriptor_pool,
         .remaining_sets =
             this->max_sets - 1, // A set is being allocated so the max sets must be decreased by 1
         .pool_sizes = current_pool_sizes,
@@ -129,21 +131,22 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
     }
 
     return DescriptorPoolInfo{
-        .pool = *this->pools.back(),
+        .descriptor_pool_data = *this->descriptor_pool_datas.back(),
         .pool_size_indices = pool_indices,
         .pool_sizes = layout_pool_sizes,
     };
 }
 
 ///////////////////////////////////////////////////////////
-void Descriptor::clean(Pool& pool) {
+void Descriptor::clean(DescriptorPoolData& descriptor_pool_data) {
     // Remaining sets matches max sets means this pool no longer contain any sets and will be
     // removed
-    if (pool.remaining_sets == this->max_sets) {
-        for (size_t i = 0; i < this->pools.size(); ++i) {
-            if (this->pools[i].get() == &pool) {
-                this->vkal_device.get().destroyDescriptorPool(this->pools[i]->pool);
-                this->pools.erase(this->pools.begin() + i);
+    if (descriptor_pool_data.remaining_sets == this->max_sets) {
+        for (size_t i = 0; i < this->descriptor_pool_datas.size(); ++i) {
+            if (this->descriptor_pool_datas[i].get() == &descriptor_pool_data) {
+                this->device.get().destroyDescriptorPool(
+                    this->descriptor_pool_datas[i]->vk_descriptor_pool);
+                this->descriptor_pool_datas.erase(this->descriptor_pool_datas.begin() + i);
                 return;
             }
         }
@@ -154,7 +157,7 @@ void Descriptor::clean(Pool& pool) {
 ///////////////////////////////////////////////////////////
 void Descriptor::dump() {
     size_t index = 0;
-    for (const auto& pool : this->pools) {
+    for (const auto& pool : this->descriptor_pool_datas) {
         std::string remaining_sets_string(this->max_sets, '+');
         for (size_t i = 0; i < pool->remaining_sets; ++i) {
             remaining_sets_string[this->max_sets - i - 1] = '-';
