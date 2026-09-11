@@ -5,13 +5,13 @@
 namespace vkal {
 
 TEST(RenderGraphTest, GraphGenerationTest) {
-    std::vector<RenderPassParams> pass_params;
+    std::vector<RenderPassDescription> pass_params;
     /*
      * a --> d --> c
      * a --> b --> c
      */
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass a",
         .buffer_resources =
             {
@@ -22,7 +22,7 @@ TEST(RenderGraphTest, GraphGenerationTest) {
             },
     });
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass b",
         .buffer_resources =
             {
@@ -37,7 +37,7 @@ TEST(RenderGraphTest, GraphGenerationTest) {
             },
     });
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass c",
         .buffer_resources = {BufferResourceDescription{
                                  .identifier = "B-C",
@@ -51,7 +51,7 @@ TEST(RenderGraphTest, GraphGenerationTest) {
                              }},
     });
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass d",
         .buffer_resources =
             {
@@ -96,9 +96,9 @@ TEST(RenderGraphTest, GraphGenerationTest) {
 }
 
 TEST(RenderGraphTest, PruningTest) {
-    std::vector<RenderPassParams> pass_params;
+    std::vector<RenderPassDescription> pass_params;
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass a",
         .image_resources =
             {
@@ -110,7 +110,7 @@ TEST(RenderGraphTest, PruningTest) {
             },
     });
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass b",
         .buffer_resources =
             {
@@ -128,7 +128,7 @@ TEST(RenderGraphTest, PruningTest) {
             },
     });
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass c",
         .buffer_resources =
             {
@@ -146,7 +146,7 @@ TEST(RenderGraphTest, PruningTest) {
             },
     });
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass d",
         .buffer_resources =
             {
@@ -157,7 +157,7 @@ TEST(RenderGraphTest, PruningTest) {
             },
     });
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "root pass",
         .buffer_resources =
             {
@@ -172,7 +172,7 @@ TEST(RenderGraphTest, PruningTest) {
             },
         .render_attachments =
             {
-                vkal::RenderAttachmentParams{
+                vkal::RenderAttachmentDescription{
                     .type = vkal::RenderAttachmentType::SWAPCHAIN,
                     .identifier = "swapchain attachment",
                     .clear_value = vk::ClearValue(
@@ -242,9 +242,9 @@ TEST(RenderGraphTest, PruningTest) {
 }
 
 TEST(RenderGraphTest, ToplogySortTest) {
-    std::vector<RenderPassParams> pass_params;
+    std::vector<RenderPassDescription> pass_params;
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "root pass",
         .buffer_resources =
             {
@@ -259,7 +259,7 @@ TEST(RenderGraphTest, ToplogySortTest) {
             },
         .render_attachments =
             {
-                vkal::RenderAttachmentParams{
+                vkal::RenderAttachmentDescription{
                     .type = vkal::RenderAttachmentType::SWAPCHAIN,
                     .identifier = "swapchain attachment",
                     .clear_value = vk::ClearValue(
@@ -270,7 +270,7 @@ TEST(RenderGraphTest, ToplogySortTest) {
             },
     });
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass a",
         .buffer_resources =
             {
@@ -281,7 +281,7 @@ TEST(RenderGraphTest, ToplogySortTest) {
             },
     });
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass d",
         .buffer_resources =
             {
@@ -292,7 +292,7 @@ TEST(RenderGraphTest, ToplogySortTest) {
             },
     });
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass b",
         .buffer_resources =
             {
@@ -307,7 +307,7 @@ TEST(RenderGraphTest, ToplogySortTest) {
             },
     });
 
-    pass_params.push_back(RenderPassParams{
+    pass_params.push_back(RenderPassDescription{
         .identifier = "pass c",
         .buffer_resources =
             {
