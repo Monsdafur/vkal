@@ -55,10 +55,6 @@ class Image {
 
     vk::ImageView get_view() const;
 
-    void upload(void* data, vk::DeviceSize size);
-
-    void get_raw_data(void* data);
-
     vk::ImageAspectFlags get_aspect();
 
     vk::AccessFlags2 get_access(size_t index);
@@ -88,7 +84,6 @@ class Image {
     vk::MemoryRequirements memory_requirements;
     std::optional<MemoryAllocatorInfo> allocator_info;
     vk::ImageView view;
-    void* data = nullptr;
     std::vector<vk::AccessFlags2> accesses;
     std::vector<vk::PipelineStageFlags2> stages;
     std::vector<vk::ImageLayout> layouts;

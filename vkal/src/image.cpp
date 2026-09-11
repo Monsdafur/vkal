@@ -11,7 +11,6 @@ Image::Image(const ImageParams& params)
       allocator_info(params.memory_allocator.bind_image(this->image, params.memory_properties,
                                                         this->memory_requirements)),
       view(this->create_view()) {
-    this->allocator_info->block.map_data(this->allocator_info->chunk, &this->data);
     this->is_swapchain_owned = false;
 
     this->accesses = std::vector<vk::AccessFlags2>(this->mip_levels, vk::AccessFlagBits2::eNone);
@@ -105,25 +104,6 @@ vk::MemoryRequirements Image::get_requirements() {
     return this->vkal_device.get()
         .getImageMemoryRequirements2(memory_requirements_info)
         .memoryRequirements;
-}
-
-///////////////////////////////////////////////////////////
-void Image::upload(void* data, vk::DeviceSize size) {
-    if (this->data == nullptr) {
-        throw std::runtime_error("Uploading to a non host visible image");
-    }
-    if (size > memory_requirements.size) {
-        throw std::runtime_error("Upload size exceeds image size");
-    }
-    std::memcpy(this->data, data, size);
-}
-
-///////////////////////////////////////////////////////////
-void Image::get_raw_data(void* data) {
-    if (this->data == nullptr) {
-        throw std::runtime_error("Reading from a non host visible image");
-    }
-    std::memcpy(data, this->data, this->memory_requirements.size);
 }
 
 ///////////////////////////////////////////////////////////
