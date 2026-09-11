@@ -41,7 +41,7 @@ const vk::MemoryRequirements Buffer::get_memory_requirements() const {
 
 ///////////////////////////////////////////////////////////
 void Buffer::upload(void* data, vk::DeviceSize size) {
-    if (!this->data) {
+    if (this->data == nullptr) {
         throw std::runtime_error("Uploading to a non host visible buffer");
     }
     if (size > memory_requirements.size) {
@@ -52,7 +52,7 @@ void Buffer::upload(void* data, vk::DeviceSize size) {
 
 ///////////////////////////////////////////////////////////
 void Buffer::get_raw_data(void* data) {
-    if (!this->data) {
+    if (this->data == nullptr) {
         throw std::runtime_error("Reading from a non host visible buffer");
     }
     std::memcpy(data, this->data, this->size);

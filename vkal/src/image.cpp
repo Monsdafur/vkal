@@ -109,8 +109,8 @@ vk::MemoryRequirements Image::get_requirements() {
 
 ///////////////////////////////////////////////////////////
 void Image::upload(void* data, vk::DeviceSize size) {
-    if (!this->data) {
-        throw std::runtime_error("Uploading to a non host visible buffer");
+    if (this->data == nullptr) {
+        throw std::runtime_error("Uploading to a non host visible image");
     }
     if (size > memory_requirements.size) {
         throw std::runtime_error("Upload size exceeds image size");
@@ -120,8 +120,8 @@ void Image::upload(void* data, vk::DeviceSize size) {
 
 ///////////////////////////////////////////////////////////
 void Image::get_raw_data(void* data) {
-    if (!this->data) {
-        throw std::runtime_error("Reading from a non host visible buffer");
+    if (this->data == nullptr) {
+        throw std::runtime_error("Reading from a non host visible image");
     }
     std::memcpy(data, this->data, this->memory_requirements.size);
 }

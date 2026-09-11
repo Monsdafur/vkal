@@ -52,7 +52,7 @@ class Buffer {
     vk::Buffer buffer;
     vk::MemoryRequirements memory_requirements;
     MemoryAllocatorInfo allocator_info;
-    void* data;
+    void* data = nullptr;
     vk::AccessFlags2 access;
     vk::PipelineStageFlags2 stage;
 

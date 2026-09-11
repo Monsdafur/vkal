@@ -88,7 +88,7 @@ class Image {
     vk::MemoryRequirements memory_requirements;
     std::optional<MemoryAllocatorInfo> allocator_info;
     vk::ImageView view;
-    void* data;
+    void* data = nullptr;
     std::vector<vk::AccessFlags2> accesses;
     std::vector<vk::PipelineStageFlags2> stages;
     std::vector<vk::ImageLayout> layouts;
