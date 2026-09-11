@@ -76,7 +76,7 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
             continue;
         }
 
-        // If a matching descriptor pool is found descrease each pool size
+        // If a matching descriptor pool is found decrease each pool size
         for (size_t i = 0; i < layout_pool_sizes.size(); ++i) {
             pool->pool_sizes[pool_indices[i]].descriptorCount -=
                 layout_pool_sizes[i].descriptorCount;
@@ -100,7 +100,10 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
                                                  pool_size.descriptorCount,
                                                  vk::to_string(pool_size.type), this->pool_size));
         }
-        current_pool_sizes.push_back(vk::DescriptorPoolSize(pool_size.type, this->pool_size));
+
+        // A set is being allocated so each pool size have to be shrunken to match the current set
+        current_pool_sizes.push_back(
+            vk::DescriptorPoolSize(pool_size.type, this->pool_size - pool_size.descriptorCount));
     }
 
     // Setup descriptor pool create info
@@ -108,11 +111,6 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
     descriptor_pool_create_info.setFlags(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
         .setMaxSets(this->max_sets)
         .setPoolSizes(current_pool_sizes);
-
-    // Update descriptor pool sizes
-    for (size_t i = 0; i < layout_pool_sizes.size(); ++i) {
-        current_pool_sizes[i].descriptorCount -= layout_pool_sizes[i].descriptorCount;
-    }
 
     vk::DescriptorPool descriptor_pool =
         this->vkal_device.get().createDescriptorPool(descriptor_pool_create_info);
@@ -139,6 +137,8 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
 
 ///////////////////////////////////////////////////////////
 void Descriptor::clean(Pool& pool) {
+    // Remaining sets matches max sets means this pool no longer contain any sets and will be
+    // removed
     if (pool.remaining_sets == this->max_sets) {
         for (size_t i = 0; i < this->pools.size(); ++i) {
             if (this->pools[i].get() == &pool) {
