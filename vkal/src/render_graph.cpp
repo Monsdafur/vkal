@@ -38,9 +38,10 @@ static void categorize_image_resources(const std::vector<ImageResourceDescriptio
 }
 
 ///////////////////////////////////////////////////////////
-static std::vector<GraphNode> generate_graph(const std::vector<RenderPassParams>& pass_params) {
+static std::vector<GraphNode>
+generate_graph(const std::vector<RenderPassDescription>& pass_description) {
     std::vector<GraphNode> nodes;
-    for (const auto& [index, pass] : std::ranges::views::enumerate(pass_params)) {
+    for (const auto& [index, pass] : std::ranges::views::enumerate(pass_description)) {
         GraphNode node;
         node.pass_index = index;
 
@@ -52,7 +53,8 @@ static std::vector<GraphNode> generate_graph(const std::vector<RenderPassParams>
         categorize_buffer_resources(pass.buffer_resources, read_resources, write_resources);
         categorize_image_resources(pass.image_resources, read_resources, write_resources);
 
-        for (const auto& [other_index, other_pass] : std::ranges::views::enumerate(pass_params)) {
+        for (const auto& [other_index, other_pass] :
+             std::ranges::views::enumerate(pass_description)) {
             if (index == other_index) {
                 continue;
             }
@@ -122,8 +124,9 @@ static std::vector<GraphNode> generate_graph(const std::vector<RenderPassParams>
 }
 
 ///////////////////////////////////////////////////////////
-std::vector<std::pair<GraphNode, size_t>> prune(const std::vector<RenderPassParams>& pass_params,
-                                                const std::vector<GraphNode>& nodes) {
+std::vector<std::pair<GraphNode, size_t>>
+prune(const std::vector<RenderPassDescription>& pass_description,
+      const std::vector<GraphNode>& nodes) {
     std::vector<std::pair<GraphNode, size_t>> dfs;
     std::vector<GraphNode> stack;
     std::set<size_t> visited;
@@ -131,9 +134,9 @@ std::vector<std::pair<GraphNode, size_t>> prune(const std::vector<RenderPassPara
     // The root node is the ndoe that contains a render attachment that writes to the swapchain
     for (const GraphNode& node : nodes) {
         bool is_root = false;
-        for (const RenderAttachmentParams& attachment_params :
-             pass_params[node.pass_index].render_attachments) {
-            if (attachment_params.type == RenderAttachmentType::SWAPCHAIN) {
+        for (const RenderAttachmentDescription& attachment_description :
+             pass_description[node.pass_index].render_attachments) {
+            if (attachment_description.type == RenderAttachmentType::SWAPCHAIN) {
                 is_root = true;
                 break;
             }
@@ -195,8 +198,6 @@ RenderGraph::RenderGraph(const RenderGraphParams& params)
     this->semaphore = this->vkal_device.get().createSemaphore(vk::SemaphoreCreateInfo());
     this->fence = this->vkal_device.get().createFence(
         vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
-
-    this->reset_swapchain_images();
 }
 
 RenderGraph::~RenderGraph() {
@@ -205,14 +206,16 @@ RenderGraph::~RenderGraph() {
 }
 
 ///////////////////////////////////////////////////////////
-void RenderGraph::add_pass(RenderPassParams pass_params) {
-    this->pass_params.push_back(std::move(pass_params));
+void RenderGraph::add_pass(std::unique_ptr<RenderPass> render_pass,
+                           const RenderPassDescription& pass_description) {
+    this->pass_descriptions.push_back(pass_description);
+    this->render_passes.push_back(std::move(render_pass));
 }
 
 ///////////////////////////////////////////////////////////
 void RenderGraph::compile() {
-    std::vector<GraphNode> nodes = generate_graph(this->pass_params);
-    std::vector<std::pair<GraphNode, size_t>> post_pruned = prune(this->pass_params, nodes);
+    std::vector<GraphNode> nodes = generate_graph(this->pass_descriptions);
+    std::vector<std::pair<GraphNode, size_t>> post_pruned = prune(this->pass_descriptions, nodes);
     this->pass_order = topology_sort(post_pruned);
 
     this->generate_passes();
@@ -220,14 +223,15 @@ void RenderGraph::compile() {
 
 ///////////////////////////////////////////////////////////
 void RenderGraph::generate_passes() {
-    debug(std::format("Compiling render graph ({} passes)", this->pass_params.size()));
+    debug(std::format("Compiling render graph ({} passes)", this->pass_descriptions.size()));
     for (size_t pass_index : this->pass_order) {
-        RenderPassParams& pass_params = this->pass_params[pass_index];
+        RenderPassDescription& pass_description = this->pass_descriptions[pass_index];
 
         std::unique_ptr<RenderPassData> pass = std::make_unique<RenderPassData>();
+        pass->pass_index = pass_index;
 
-        if (pass_params.pipeline.has_value()) {
-            pass->pipeline = this->render_resources.get_pipeline(*pass_params.pipeline);
+        if (pass_description.pipeline.has_value()) {
+            pass->pipeline = this->render_resources.get_pipeline(*pass_description.pipeline);
             std::vector<std::reference_wrapper<DescriptorLayout>> set_layouts =
                 pass->pipeline->get().get_layout().get_descriptor_layouts();
             uint32_t max_array_size = 1;
@@ -253,7 +257,8 @@ void RenderGraph::generate_passes() {
         std::unordered_map<std::string, vk::ImageLayout> layouts;
 
         // Collect all buffer and image resources
-        for (const BufferResourceDescription& buffer_description : pass_params.buffer_resources) {
+        for (const BufferResourceDescription& buffer_description :
+             pass_description.buffer_resources) {
             const std::string& identifier = buffer_description.identifier;
             std::optional<ResourceBarrier> barrier = buffer_description.barrier;
 
@@ -289,7 +294,7 @@ void RenderGraph::generate_passes() {
         }
         pass->buffer_barriers.reserve(pass->buffer_barrier_builders.size());
 
-        for (const ImageResourceDescription& image_description : pass_params.image_resources) {
+        for (const ImageResourceDescription& image_description : pass_description.image_resources) {
             const std::string& identifier = image_description.identifier;
             ResourceBarrier barrier = image_description.barrier;
 
@@ -328,7 +333,8 @@ void RenderGraph::generate_passes() {
         pass->image_barriers.reserve(pass->image_barrier_builders.size() + 1);
 
         // Collect all sampler resources
-        for (const SamplerResourceDescription& sampler_resource : pass_params.sampler_resources) {
+        for (const SamplerResourceDescription& sampler_resource :
+             pass_description.sampler_resources) {
             const std::string& identifier = sampler_resource.identifier;
             Sampler& sampler = this->render_resources.get_sampler(identifier);
             if (pass->descriptor_set != nullptr) {
@@ -347,28 +353,30 @@ void RenderGraph::generate_passes() {
         vk::Extent3D required_extent(0, 0, 0);
         if (pass->pipeline.has_value() &&
             pass->pipeline->get().get_bind_point() == vk::PipelineBindPoint::eGraphics) {
-            for (const RenderAttachmentParams& attachment_params : pass_params.render_attachments) {
+            for (const RenderAttachmentDescription& attachment_description :
+                 pass_description.render_attachments) {
                 RenderAttachmentBuilder attachment_builder = {
-                    .type = attachment_params.type,
-                    .image_identifier = attachment_params.image,
-                    .resolve_image_identifier = attachment_params.resolve_image,
-                    .resolve_mode = attachment_params.resolve_mode,
-                    .clear_value = attachment_params.clear_value,
-                    .load_op = attachment_params.load_op,
-                    .store_op = attachment_params.store_op,
+                    .type = attachment_description.type,
+                    .image_identifier = attachment_description.image,
+                    .resolve_image_identifier = attachment_description.resolve_image,
+                    .resolve_mode = attachment_description.resolve_mode,
+                    .clear_value = attachment_description.clear_value,
+                    .load_op = attachment_description.load_op,
+                    .store_op = attachment_description.store_op,
                 };
                 vk::Extent3D attachment_extent(0, 0, 0);
-                if (attachment_params.image.has_value()) {
-                    Image& image = pass->image_resources.at(*attachment_params.image);
+                if (attachment_description.image.has_value()) {
+                    Image& image = pass->image_resources.at(*attachment_description.image);
                     attachment_builder.image = image;
-                    attachment_builder.layout = layouts.at(*attachment_params.image);
+                    attachment_builder.layout = layouts.at(*attachment_description.image);
                     attachment_extent = image.get_extent();
                 }
 
-                if (attachment_params.type == RenderAttachmentType::SWAPCHAIN) {
+                if (attachment_description.type == RenderAttachmentType::SWAPCHAIN) {
                     pass->write_swapchain = true;
-                    vk::Extent3D swapchain_extent =
-                        this->swapchain_images.front().get().get_extent();
+                    vk::Extent3D swapchain_extent(
+                        this->vkal_surface.get_capabilities().currentExtent.width,
+                        this->vkal_surface.get_capabilities().currentExtent.height, 1);
                     if (attachment_extent.width == 0) {
                         attachment_extent = swapchain_extent;
                     } else if (attachment_extent != swapchain_extent) {
@@ -385,7 +393,7 @@ void RenderGraph::generate_passes() {
                     }
                 } else if (attachment_builder.resolve_image_identifier.has_value()) {
                     Image& resolve_image =
-                        pass->image_resources.at(*attachment_params.resolve_image);
+                        pass->image_resources.at(*attachment_description.resolve_image);
                     if (attachment_extent != resolve_image.get_extent()) {
                         throw std::runtime_error("Render graph compite error (Main "
                                                  "image and resolve image extent mismatch)");
@@ -408,13 +416,12 @@ void RenderGraph::generate_passes() {
             pass->render_attachment_infos.reserve(pass->render_attachment_builders.size());
         }
 
-        pass->pass = std::move(pass_params.pass);
         std::optional<std::reference_wrapper<DescriptorSet>> descriptor_set = std::nullopt;
         if (pass->descriptor_set != nullptr) {
             descriptor_set = *pass->descriptor_set;
         }
-        pass->pass->setup_metadata(pass->buffer_resources, pass->image_resources, pass->pipeline,
-                                   descriptor_set);
+        this->render_passes[pass->pass_index]->setup_metadata(
+            pass->buffer_resources, pass->image_resources, pass->pipeline, descriptor_set);
         this->pass_data.push_back(std::move(pass));
     }
 
@@ -437,7 +444,7 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
     command.reset();
     command.begin(vk::CommandBufferBeginInfo());
 
-    Image& swapchain_image = this->swapchain_images[swapchain_index];
+    Image& swapchain_image = this->vkal_surface.get_image(swapchain_index);
 
     for (std::unique_ptr<RenderPassData>& pass : this->pass_data) {
         pass->render_attachment_infos.clear();
@@ -556,10 +563,10 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
             }
 
             command.beginRendering(rendering_info);
-            pass->pass->render(command);
+            this->render_passes[pass->pass_index]->render(command);
             command.endRendering();
         } else { // If pass contains no render attachments proceed without render commands
-            pass->pass->render(command);
+            this->render_passes[pass->pass_index]->render(command);
         }
 
         // Post render barriers
@@ -601,64 +608,14 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
 
 ///////////////////////////////////////////////////////////
 void RenderGraph::rebind_resources() {
-    for (std::unique_ptr<RenderPassData>& pass_data : this->pass_data) {
-        for (auto& entry : pass_data->buffer_resources) {
-            entry.second = this->render_resources.get_buffer(entry.first);
-        }
-        for (auto& entry : pass_data->image_resources) {
-            entry.second = this->render_resources.get_image(entry.first);
-        }
-        for (const BufferDescriptorData& descriptor_data : pass_data->buffer_descriptor_data) {
-            pass_data->descriptor_set->write_buffer(BufferWriteParams{
-                .buffers = {pass_data->buffer_resources.at(descriptor_data.identifier)},
-                .set_index = descriptor_data.descriptor.set,
-                .type = descriptor_data.descriptor.type,
-                .binding = descriptor_data.descriptor.binding,
-                .first_element = 0,
-            });
-        }
-        for (const ImageDescriptorData& descriptor_data : pass_data->image_descriptor_data) {
-            pass_data->descriptor_set->write_sampler(SamplerWriteParams{
-                .images = {pass_data->image_resources.at(descriptor_data.identifier)},
-                .layout = descriptor_data.layout,
-                .set_index = descriptor_data.descriptor.set,
-                .type = descriptor_data.descriptor.type,
-                .binding = descriptor_data.descriptor.binding,
-                .first_element = 0,
-            });
-        }
-        for (RenderAttachmentBuilder& attachment_builder : pass_data->render_attachment_builders) {
-            if (attachment_builder.image_identifier.has_value()) {
-                attachment_builder.image =
-                    pass_data->image_resources.at(*attachment_builder.image_identifier);
-                if (attachment_builder.resolve_image_identifier.has_value()) {
-                    attachment_builder.resolve_image =
-                        pass_data->image_resources.at(*attachment_builder.resolve_image_identifier);
-                }
-            }
-        }
-        for (BufferBarrierBuilder& barrier_builder : pass_data->buffer_barrier_builders) {
-            barrier_builder.buffer = pass_data->buffer_resources.at(barrier_builder.identifier);
-        }
-        for (ImageBarrierBuilder& barrier_builder : pass_data->image_barrier_builders) {
-            barrier_builder.image = pass_data->image_resources.at(barrier_builder.identifier);
-        }
-        pass_data->pass->on_rebound_resources(pass_data->buffer_resources,
-                                              pass_data->image_resources);
-    }
+    this->pass_data.clear();
+    this->generate_passes();
+    debug("Rebound all resources");
 }
 
 ///////////////////////////////////////////////////////////
 vk::Semaphore RenderGraph::get_semaphore() {
     return this->semaphore;
-}
-
-///////////////////////////////////////////////////////////
-void RenderGraph::reset_swapchain_images() {
-    this->swapchain_images.clear();
-    for (size_t i = 0; i < this->vkal_surface.get_image_count(); ++i) {
-        this->swapchain_images.push_back(this->vkal_surface.get_image(i));
-    }
 }
 
 } // namespace vkal

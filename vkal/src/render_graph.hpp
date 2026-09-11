@@ -24,7 +24,7 @@ struct ResourceBarrier {
     vk::PipelineStageFlags2 stage;
 };
 
-struct RenderAttachmentParams {
+struct RenderAttachmentDescription {
     RenderAttachmentType type;
     std::string identifier;
     std::optional<std::string> image;
@@ -61,16 +61,14 @@ struct SamplerResourceDescription {
     uint32_t array_index = 0;
 };
 
-struct RenderPassParams {
+struct RenderPassDescription {
     std::string identifier;
     std::vector<BufferResourceDescription> buffer_resources;
     std::vector<ImageResourceDescription> image_resources;
-    std::vector<RenderAttachmentParams> render_attachments;
+    std::vector<RenderAttachmentDescription> render_attachments;
     std::vector<SamplerResourceDescription> sampler_resources;
 
     std::optional<std::string> pipeline;
-
-    std::unique_ptr<RenderPass> pass;
 };
 
 struct RenderGraphParams {
@@ -133,6 +131,7 @@ struct ImageDescriptorData {
 };
 
 struct RenderPassData {
+    size_t pass_index;
     std::optional<std::reference_wrapper<Pipeline>> pipeline;
     DescriptorSetPtr descriptor_set;
 
@@ -152,7 +151,6 @@ struct RenderPassData {
     std::vector<BufferDescriptorData> buffer_descriptor_data;
     std::vector<ImageDescriptorData> image_descriptor_data;
 
-    std::unique_ptr<RenderPass> pass;
     bool write_swapchain = false;
 };
 
@@ -168,7 +166,8 @@ class RenderGraph {
 
     ~RenderGraph();
 
-    void add_pass(RenderPassParams pass_params);
+    void add_pass(std::unique_ptr<RenderPass> render_pass,
+                  const RenderPassDescription& pass_description);
 
     void compile();
 
@@ -181,8 +180,6 @@ class RenderGraph {
 
     vk::Semaphore get_semaphore();
 
-    void reset_swapchain_images();
-
   private:
     void generate_passes();
 
@@ -191,11 +188,10 @@ class RenderGraph {
     RenderResources& render_resources;
     Descriptor& vkal_descriptor;
 
-    std::vector<std::reference_wrapper<Image>> swapchain_images;
-
-    std::vector<RenderPassParams> pass_params;
+    std::vector<RenderPassDescription> pass_descriptions;
     std::vector<size_t> pass_order;
     std::vector<std::unique_ptr<RenderPassData>> pass_data;
+    std::vector<std::unique_ptr<RenderPass>> render_passes;
 
     vk::Semaphore semaphore;
     vk::Fence fence;
