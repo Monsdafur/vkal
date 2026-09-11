@@ -203,7 +203,7 @@ void Device::create_device(const DeviceParams& params) {
     vk::PhysicalDeviceVulkan13Features physical_device_vulkan_features_13;
     physical_device_vulkan_features_13.setSynchronization2(true).setDynamicRendering(true);
 
-#if defined(VK2D_VULKAN_VERSION_1_4)
+#if defined(VULKAN_VERSION_1_4)
     vk::PhysicalDeviceVulkan14Features physical_device_vulkan_features_14;
 #endif
 
@@ -213,7 +213,7 @@ void Device::create_device(const DeviceParams& params) {
         vk::PhysicalDeviceFeatures().setFillModeNonSolid(true).setSamplerAnisotropy(true));
 
     // Chaining device features
-#if defined(VK2D_VULKAN_VERSION_1_4)
+#if defined(VULKAN_VERSION_1_4)
     physical_device_features.setPNext(&physical_device_vulkan_features_14);
     physical_device_vulkan_features_14.setPNext(physical_device_vulkan_features_13);
 #else
