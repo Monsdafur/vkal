@@ -242,16 +242,11 @@ void RenderGraph::generate_passes() {
                 }
             }
 
-            DescriptorSetParams set_params = {
+            pass->descriptor_set = descriptor_set_ptr(DescriptorSetParams{
                 .device = this->device,
                 .layouts = set_layouts,
                 .descriptor = this->descriptor,
-            };
-            if (max_array_size > 1) {
-                set_params.enable_dynamic_sized_array = true;
-                set_params.dynamic_array_size = max_array_size;
-            }
-            pass->descriptor_set = descriptor_set_ptr(set_params);
+            });
         }
         // Store image layouts by identifier to later setup render attachments
         std::unordered_map<std::string, vk::ImageLayout> layouts;
