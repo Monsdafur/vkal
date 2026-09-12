@@ -173,7 +173,7 @@ class RenderGraph {
 
     void sync();
 
-    void execute(uint32_t swapchain_index, vk::Queue queue, vk::CommandBuffer command,
+    void execute(uint32_t swapchain_index, vk::Queue vk_queue, vk::CommandBuffer vk_command,
                  vk::Semaphore semaphore);
 
     void rebind_resources();

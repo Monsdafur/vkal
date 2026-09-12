@@ -196,8 +196,8 @@ RenderGraph::RenderGraph(const RenderGraphParams& params)
       descriptor(params.descriptor) {
 
     this->vk_semaphore = this->device.get().createSemaphore(vk::SemaphoreCreateInfo());
-    this->vk_fence = this->device.get().createFence(
-        vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
+    this->vk_fence =
+        this->device.get().createFence(vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
 }
 
 RenderGraph::~RenderGraph() {
@@ -438,11 +438,11 @@ void RenderGraph::sync() {
 }
 
 ///////////////////////////////////////////////////////////
-void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::CommandBuffer command,
-                          vk::Semaphore semaphore) {
+void RenderGraph::execute(uint32_t swapchain_index, vk::Queue vk_queue,
+                          vk::CommandBuffer vk_command, vk::Semaphore semaphore) {
     this->device.get().resetFences(this->vk_fence);
-    command.reset();
-    command.begin(vk::CommandBufferBeginInfo());
+    vk_command.reset();
+    vk_command.begin(vk::CommandBufferBeginInfo());
 
     Image& swapchain_image = this->surface.get_image(swapchain_index);
 
@@ -505,7 +505,7 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
 
         dependency_info.setBufferMemoryBarriers(pass->buffer_barriers)
             .setImageMemoryBarriers(pass->image_barriers);
-        command.pipelineBarrier2(dependency_info);
+        vk_command.pipelineBarrier2(dependency_info);
 
         vk::Extent3D render_extent;
         std::optional<vk::RenderingAttachmentInfo> depth_attachment_opt = std::nullopt;
@@ -562,11 +562,11 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
                 rendering_info.setPDepthAttachment(&*depth_attachment_opt);
             }
 
-            command.beginRendering(rendering_info);
-            this->render_passes[pass->pass_index]->render(command);
-            command.endRendering();
+            vk_command.beginRendering(rendering_info);
+            this->render_passes[pass->pass_index]->render(vk_command);
+            vk_command.endRendering();
         } else { // If pass contains no render attachments proceed without render commands
-            this->render_passes[pass->pass_index]->render(command);
+            this->render_passes[pass->pass_index]->render(vk_command);
         }
 
         // Post render barriers
@@ -582,14 +582,14 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
                 .setSubresourceRange(
                     vk::ImageSubresourceRange(swapchain_image.get_aspect(), 0, 1, 0, 1));
             dependency_info.setBufferMemoryBarriers({}).setImageMemoryBarriers(swapchain_barrier);
-            command.pipelineBarrier2(dependency_info);
+            vk_command.pipelineBarrier2(dependency_info);
         }
     }
 
-    command.end();
+    vk_command.end();
 
     vk::CommandBufferSubmitInfo command_submit_info;
-    command_submit_info.setCommandBuffer(command).setDeviceMask(1);
+    command_submit_info.setCommandBuffer(vk_command).setDeviceMask(1);
 
     vk::SemaphoreSubmitInfo signal_semaphore_info;
     signal_semaphore_info.setSemaphore(semaphore).setStageMask(
@@ -603,7 +603,7 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue queue, vk::Command
     submit_info.setCommandBufferInfos(command_submit_info)
         .setSignalSemaphoreInfos(signal_semaphore_info)
         .setWaitSemaphoreInfos(wait_semaphore_info);
-    queue.submit2(submit_info, this->vk_fence);
+    vk_queue.submit2(submit_info, this->vk_fence);
 }
 
 ///////////////////////////////////////////////////////////
