@@ -30,7 +30,7 @@ struct SwapchainImageParams {
 
 class Image {
   public:
-    // No copy and mo move
+    // No copy and no move
     Image(const Image&) = delete;
     Image& operator=(const Image&) = delete;
     Image(Image&&) = delete;

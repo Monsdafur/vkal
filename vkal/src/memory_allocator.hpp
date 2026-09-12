@@ -18,7 +18,7 @@ struct MemoryAllocatorInfo;
 
 class MemoryAllocator {
   public:
-    // No copy and mo move
+    // No copy and no move
     MemoryAllocator(const MemoryAllocator&) = delete;
     MemoryAllocator& operator=(const MemoryAllocator&) = delete;
     MemoryAllocator(MemoryAllocator&&) = delete;

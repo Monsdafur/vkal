@@ -16,7 +16,7 @@ struct CommandParams {
 
 class Command {
   public:
-    // No copy and mo move
+    // No copy and no move
     Command(const Command&) = delete;
     Command& operator=(const Command&) = delete;
     Command(Command&&) = delete;

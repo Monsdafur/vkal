@@ -3,9 +3,8 @@ cmake_minimum_required(VERSION 4.4.1)
 # Vulkan
 find_package(Vulkan REQUIRED)
 
-# Fetch GLFW
+# Fetch SDL3 for windowing/input
 include(FetchContent)
-# Fetch SDL3 contents
 FetchContent_Declare(
     sdl3
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git

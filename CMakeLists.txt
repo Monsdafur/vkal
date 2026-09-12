@@ -111,7 +111,7 @@ file (GLOB VKAL_HELPER_SRC
     "samples/vkal-helper/*.cpp" 
 )
 add_library(vkal-helper STATIC ${VKAL_HELPER_SRC})
-include_directories(vkal-helper PUBLIC ${CMAKE_SOURCE_DIR}/samplers/vkal-helper)
+include_directories(vkal-helper PUBLIC ${CMAKE_SOURCE_DIR}/samples/vkal-helper)
 target_link_libraries(vkal-helper PUBLIC vkal glm)
 
 # Add executables

@@ -35,11 +35,11 @@ static vk::ShaderModule create_shader_module(vk::Device device,
                                              const std::filesystem::path& file_path) {
     std::vector<uint32_t> shader_code = load_shader_file(file_path);
 
-    vk::ShaderModuleCreateInfo shader_module_create_create_info;
-    shader_module_create_create_info.setCodeSize(shader_code.size() * sizeof(uint32_t))
+    vk::ShaderModuleCreateInfo shader_module_create_info;
+    shader_module_create_info.setCodeSize(shader_code.size() * sizeof(uint32_t))
         .setCode(shader_code);
 
-    vk::ShaderModule shader_module = device.createShaderModule(shader_module_create_create_info);
+    vk::ShaderModule shader_module = device.createShaderModule(shader_module_create_info);
 
     return shader_module;
 }
@@ -59,13 +59,13 @@ Pipeline::Pipeline(const GraphicsPipelineParams& params)
     pipeline_dynamic_state_create_info.setDynamicStates(dynamic_states);
 
     // Vertex input
-    vk::VertexInputBindingDescription vertex_input_binding_descriptrion;
-    vertex_input_binding_descriptrion.setBinding(0)
+    vk::VertexInputBindingDescription vertex_input_binding_description;
+    vertex_input_binding_description.setBinding(0)
         .setInputRate(params.vertex_input_rate)
         .setStride(params.vertex_stride);
     vk::PipelineVertexInputStateCreateInfo pipeline_vertex_input_state_create_info;
     pipeline_vertex_input_state_create_info
-        .setVertexBindingDescriptions(vertex_input_binding_descriptrion)
+        .setVertexBindingDescriptions(vertex_input_binding_description)
         .setVertexAttributeDescriptions(params.vertex_descriptions);
 
     // Input assembly

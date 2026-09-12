@@ -86,7 +86,7 @@ int main() {
             throw std::runtime_error(SDL_GetError());
         }
 
-        SDL_Window* window = SDL_CreateWindow("Texture", WINDOW_EXTENT.width, WINDOW_EXTENT.height,
+        SDL_Window* window = SDL_CreateWindow("Triangle", WINDOW_EXTENT.width, WINDOW_EXTENT.height,
                                               SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
         if (!window) {
             throw std::runtime_error(SDL_GetError());
@@ -132,7 +132,7 @@ int main() {
                 .block_size = vkal::megabytes(128),
             });
 
-        // Craete descriptor
+        // Create descriptor
         vkal::DescriptorPtr descriptor = vkal::descriptor_ptr(vkal::DescriptorParams{
             .device = *device,
             .max_sets = 10,
@@ -157,7 +157,7 @@ int main() {
             .binding_flags = {vk::DescriptorBindingFlags()},
         });
 
-        // Create graphcis pipeline
+        // Create graphics pipeline
         render_resources->create_pipeline_layout(vkal::PipelineLayoutResourceParams{
             .identifier = "default pipeline layout",
             .descriptor_layout_identifiers = {"default descriptor layout"},
@@ -259,14 +259,14 @@ int main() {
         });
 
         {
-            std::vector<vkal::BufferResourceDescription> resrouces_descriptions;
-            resrouces_descriptions.push_back(vkal::BufferResourceDescription{
+            std::vector<vkal::BufferResourceDescription> resources_descriptions;
+            resources_descriptions.push_back(vkal::BufferResourceDescription{
                 .identifier = "vertex buffer",
             });
-            resrouces_descriptions.push_back(vkal::BufferResourceDescription{
+            resources_descriptions.push_back(vkal::BufferResourceDescription{
                 .identifier = "index buffer",
             });
-            resrouces_descriptions.push_back(vkal::BufferResourceDescription{
+            resources_descriptions.push_back(vkal::BufferResourceDescription{
                 .identifier = "uniform buffer",
                 .barrier =
                     vkal::ResourceBarrier{
@@ -281,8 +281,8 @@ int main() {
                     },
             });
 
-            std::vector<vkal::ImageResourceDescription> image_resrouces_descriptions;
-            image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
+            std::vector<vkal::ImageResourceDescription> image_resources_descriptions;
+            image_resources_descriptions.push_back(vkal::ImageResourceDescription{
                 .identifier = "msaa",
                 .barrier =
                     vkal::ResourceBarrier{
@@ -308,8 +308,8 @@ int main() {
 
             vkal::RenderPassDescription pass_description{
                 .identifier = "final pass",
-                .buffer_resources = resrouces_descriptions,
-                .image_resources = image_resrouces_descriptions,
+                .buffer_resources = resources_descriptions,
+                .image_resources = image_resources_descriptions,
                 .render_attachments = render_attachments,
                 .pipeline = "graphics pipeline",
             };

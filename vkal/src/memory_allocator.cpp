@@ -113,7 +113,7 @@ MemoryAllocator::query_block(vk::MemoryPropertyFlags memory_properties,
         // A block must have compatible memory type with requested buffer
         bool compatible_memory_type =
             ((1 << block->memory_type) & memory_requirements.memoryTypeBits) != 0;
-        // A memory block must have contain requested memory properties
+        // A memory block must contain the requested memory properties
         bool compatible_memory_properties =
             (memory_properties & block->properties) == block->properties;
 

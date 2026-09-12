@@ -16,7 +16,7 @@ struct BufferParams {
 
 class Buffer {
   public:
-    // No copy and mo move
+    // No copy and no move
     Buffer(const Buffer&) = delete;
     Buffer& operator=(const Buffer&) = delete;
     Buffer(Buffer&&) = delete;

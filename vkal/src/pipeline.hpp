@@ -40,7 +40,7 @@ struct ComputePipelineParams {
 
 class Pipeline {
   public:
-    // No copy and mo move
+    // No copy and no move
     Pipeline(const Pipeline&) = delete;
     Pipeline& operator=(const Pipeline&) = delete;
     Pipeline(Pipeline&&) = delete;

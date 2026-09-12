@@ -73,7 +73,7 @@ void Instance::create_instance() {
     uint32_t sdl_extension_count;
     const char* const* sdl_extensions = SDL_Vulkan_GetInstanceExtensions(&sdl_extension_count);
 
-    // Merge SDL exetnsions with additional extensions
+    // Merge SDL extensions with additional extensions
     std::vector<const char*> required_extensions =
         std::vector<const char*>(sdl_extensions, sdl_extensions + sdl_extension_count);
 
@@ -87,14 +87,14 @@ void Instance::create_instance() {
     std::vector<vk::ExtensionProperties> extension_properties =
         vk::enumerateInstanceExtensionProperties();
 
-    // Check support for each required extensions
+    // Check support for each required extension
     for (const char* extension : required_extensions) {
         if (std::ranges::none_of(extension_properties,
                                  [extension](const vk::ExtensionProperties& extension_property) {
                                      return strcmp(extension_property.extensionName, extension) ==
                                             0;
                                  })) {
-            throw std::runtime_error(std::format("Missing requried extension {}", extension));
+            throw std::runtime_error(std::format("Missing required extension {}", extension));
         }
     }
 
@@ -112,7 +112,7 @@ void Instance::create_instance() {
                                  [layer](const vk::LayerProperties& layer_property) {
                                      return strcmp(layer_property.layerName, layer) == 0;
                                  })) {
-            throw std::runtime_error(std::format("Missing requried layer {}", layer));
+            throw std::runtime_error(std::format("Missing required layer {}", layer));
         }
     }
 

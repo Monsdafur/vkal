@@ -25,7 +25,7 @@ struct MemoryBlockParams {
 
 class MemoryBlock {
   public:
-    // No copy and mo move
+    // No copy and no move
     MemoryBlock(const MemoryBlock&) = delete;
     MemoryBlock& operator=(const MemoryBlock&) = delete;
     MemoryBlock(MemoryBlock&&) = delete;

@@ -156,7 +156,7 @@ struct RenderPassData {
 
 class RenderGraph {
   public:
-    // No copy and mo move
+    // No copy and no move
     RenderGraph(const RenderGraph&) = delete;
     RenderGraph& operator=(const RenderGraph&) = delete;
     RenderGraph(RenderGraph&&) = delete;

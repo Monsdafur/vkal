@@ -15,7 +15,7 @@ struct PipelineLayoutParams {
 
 class PipelineLayout {
   public:
-    // No copy and mo move
+    // No copy and no move
     PipelineLayout(const PipelineLayout&) = delete;
     PipelineLayout& operator=(const PipelineLayout&) = delete;
     PipelineLayout(PipelineLayout&&) = delete;

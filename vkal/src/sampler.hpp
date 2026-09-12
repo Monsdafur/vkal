@@ -20,7 +20,7 @@ struct SamplerParams {
 
 class Sampler {
   public:
-    // No copy and mo move
+    // No copy and no move
     Sampler(const Sampler&) = delete;
     Sampler& operator=(const Sampler&) = delete;
     Sampler(Sampler&&) = delete;

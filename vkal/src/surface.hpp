@@ -19,7 +19,7 @@ struct SurfaceParams {
 
 class Surface {
   public:
-    // No copy and mo move
+    // No copy and no move
     Surface(const Surface&) = delete;
     Surface& operator=(const Surface&) = delete;
     Surface(Surface&&) = delete;

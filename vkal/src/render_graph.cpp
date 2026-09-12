@@ -131,7 +131,7 @@ prune(const std::vector<RenderPassDescription>& pass_description,
     std::vector<GraphNode> stack;
     std::set<size_t> visited;
 
-    // The root node is the ndoe that contains a render attachment that writes to the swapchain
+    // The root node is the node that contains a render attachment that writes to the swapchain
     for (const GraphNode& node : nodes) {
         bool is_root = false;
         for (const RenderAttachmentDescription& attachment_description :
@@ -380,7 +380,7 @@ void RenderGraph::generate_passes() {
                     if (attachment_extent.width == 0) {
                         attachment_extent = swapchain_extent;
                     } else if (attachment_extent != swapchain_extent) {
-                        throw std::runtime_error("Render graph compite error (Swapchain "
+                        throw std::runtime_error("Render graph compile error (Swapchain "
                                                  "image and main image extent mismatch)");
                     }
 
@@ -395,7 +395,7 @@ void RenderGraph::generate_passes() {
                     Image& resolve_image =
                         pass->image_resources.at(*attachment_description.resolve_image);
                     if (attachment_extent != resolve_image.get_extent()) {
-                        throw std::runtime_error("Render graph compite error (Main "
+                        throw std::runtime_error("Render graph compile error (Main "
                                                  "image and resolve image extent mismatch)");
                     }
                     attachment_builder.resolve_image = resolve_image;

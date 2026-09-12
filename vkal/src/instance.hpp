@@ -10,7 +10,7 @@ namespace vkal {
 
 class Instance {
   public:
-    // No copy and mo move
+    // No copy and no move
     Instance(const Instance&) = delete;
     Instance& operator=(const Instance&) = delete;
     Instance(Instance&&) = delete;

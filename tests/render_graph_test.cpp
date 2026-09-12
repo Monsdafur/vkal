@@ -241,7 +241,7 @@ TEST(RenderGraphTest, PruningTest) {
     ASSERT_TRUE(containing(pass_c.pass_index, root_pass.ins));
 }
 
-TEST(RenderGraphTest, ToplogySortTest) {
+TEST(RenderGraphTest, TopologySortTest) {
     std::vector<RenderPassDescription> pass_params;
 
     pass_params.push_back(RenderPassDescription{

@@ -85,7 +85,7 @@ struct RenderResourcesParams {
 
 class RenderResources {
   public:
-    // No copy and mo move
+    // No copy and no move
     RenderResources(const RenderResources&) = delete;
     RenderResources& operator=(const RenderResources&) = delete;
     RenderResources(RenderResources&&) = delete;

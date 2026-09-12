@@ -23,7 +23,7 @@ static bool is_device_suitable(const std::vector<vk::ExtensionProperties>& devic
     debug(std::format("\tIs dedicated GPU: {}", is_dedicated_gpu ? "yes" : "no"));
 #endif
 
-    // Device must support Vulkan 1.3 or 1.4 of the macro is defined
+    // Device must support Vulkan 1.3 or 1.4 if the macro is defined
     bool supported_version = false;
 #if defined(VULKAN_VERSION_1_4)
     supported_version = properties.apiVersion >= vk::ApiVersion14;
@@ -67,12 +67,12 @@ static bool is_device_suitable(const std::vector<vk::ExtensionProperties>& devic
 ///////////////////////////////////////////////////////////
 static bool is_format_supported(vk::PhysicalDevice physical_device, vk::Format format,
                                 vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
-    vk::FormatProperties2 format_propeties = physical_device.getFormatProperties2(format);
+    vk::FormatProperties2 format_properties = physical_device.getFormatProperties2(format);
     switch (tiling) {
     case vk::ImageTiling::eLinear:
-        return (format_propeties.formatProperties.linearTilingFeatures & features) == features;
+        return (format_properties.formatProperties.linearTilingFeatures & features) == features;
     case vk::ImageTiling::eOptimal:
-        return (format_propeties.formatProperties.optimalTilingFeatures & features) == features;
+        return (format_properties.formatProperties.optimalTilingFeatures & features) == features;
     default:
         throw std::runtime_error("Invalid image tiling");
     }

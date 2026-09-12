@@ -15,7 +15,7 @@ struct DeviceParams {
 
 class Device {
   public:
-    // No copy and mo move
+    // No copy and no move
     Device(const Device&) = delete;
     Device& operator=(const Device&) = delete;
     Device(Device&&) = delete;

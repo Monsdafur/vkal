@@ -40,7 +40,7 @@ struct DescriptorSetParams {
 
 class DescriptorSet {
   public:
-    // No copy and mo move
+    // No copy and no move
     DescriptorSet(const DescriptorSet&) = delete;
     DescriptorSet& operator=(const DescriptorSet&) = delete;
     DescriptorSet(DescriptorSet&&) = delete;
@@ -57,7 +57,7 @@ class DescriptorSet {
     void write_sampler(const SamplerWriteParams& write_params);
 
   private:
-    // Pravate methods
+    // Private methods
     vk::DescriptorSet allocate_sets(bool enable_dynamic_sized_array, uint32_t array_size);
 
     // Members

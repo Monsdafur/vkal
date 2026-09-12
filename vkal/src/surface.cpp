@@ -145,7 +145,7 @@ std::optional<uint32_t> Surface::acquire_next_frame(vk::Semaphore semaphore) {
         }
         return std::nullopt;
     default:
-        throw std::runtime_error(std::format("Failed to acquire next image with with code {}",
+        throw std::runtime_error(std::format("Failed to acquire next image with code {}",
                                              vk::to_string(acquire_result)));
     }
 }
@@ -185,7 +185,7 @@ void Surface::present() {
         }
         break;
     default:
-        throw std::runtime_error(std::format("Failed to present image with with code {}",
+        throw std::runtime_error(std::format("Failed to present image with code {}",
                                              vk::to_string(present_result)));
     }
 }

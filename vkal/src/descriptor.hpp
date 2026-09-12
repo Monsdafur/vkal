@@ -30,7 +30,7 @@ struct DescriptorParams {
 
 class Descriptor {
   public:
-    // No copy and mo move
+    // No copy and no move
     Descriptor(const Descriptor&) = delete;
     Descriptor& operator=(const Descriptor&) = delete;
     Descriptor(Descriptor&&) = delete;

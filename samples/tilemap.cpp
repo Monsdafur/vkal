@@ -27,7 +27,7 @@ int main() {
             throw std::runtime_error(SDL_GetError());
         }
 
-        SDL_Window* window = SDL_CreateWindow("Texture", 600, 600, SDL_WINDOW_VULKAN);
+        SDL_Window* window = SDL_CreateWindow("Tilemap", 600, 600, SDL_WINDOW_VULKAN);
         if (!window) {
             throw std::runtime_error(SDL_GetError());
         }
@@ -72,7 +72,7 @@ int main() {
                 .block_size = vkal::megabytes(128),
             });
 
-        // Craete descriptor
+        // Create descriptor
         vkal::DescriptorPtr descriptor = vkal::descriptor_ptr(vkal::DescriptorParams{
             .device = *device,
             .max_sets = 10,

@@ -180,7 +180,7 @@ int main() {
                 .block_size = vkal::megabytes(32),
             });
 
-        // Craete descriptor
+        // Create descriptor
         vkal::DescriptorPtr descriptor = vkal::descriptor_ptr(vkal::DescriptorParams{
             .device = *device,
             .max_sets = 100,
@@ -225,7 +225,7 @@ int main() {
             .descriptor_layout_identifiers = {"texture map descriptor layout"},
         });
 
-        // Craete pipelines
+        // Create pipelines
         render_resources->create_graphics_pipeline(vkal::GraphicsPipelineResourceParams{
             .identifier = "texture map pipeline",
             .layout_identifier = "texture map pipeline layout",
@@ -589,14 +589,14 @@ int main() {
         // Texture pass
         TexturePass* texture_pass;
         {
-            std::vector<vkal::BufferResourceDescription> buffer_resrouces_descriptions;
-            buffer_resrouces_descriptions.push_back(vkal::BufferResourceDescription{
+            std::vector<vkal::BufferResourceDescription> buffer_resources_descriptions;
+            buffer_resources_descriptions.push_back(vkal::BufferResourceDescription{
                 .identifier = "vertex buffer",
             });
-            buffer_resrouces_descriptions.push_back(vkal::BufferResourceDescription{
+            buffer_resources_descriptions.push_back(vkal::BufferResourceDescription{
                 .identifier = "index buffer",
             });
-            buffer_resrouces_descriptions.push_back(vkal::BufferResourceDescription{
+            buffer_resources_descriptions.push_back(vkal::BufferResourceDescription{
                 .identifier = "uniform buffer",
                 .barrier =
                     vkal::ResourceBarrier{
@@ -610,7 +610,7 @@ int main() {
                         .binding = 0,
                     },
             });
-            buffer_resrouces_descriptions.push_back(vkal::BufferResourceDescription{
+            buffer_resources_descriptions.push_back(vkal::BufferResourceDescription{
                 .identifier = "object buffer",
                 .barrier =
                     vkal::ResourceBarrier{
@@ -625,10 +625,10 @@ int main() {
                     },
             });
 
-            std::vector<vkal::ImageResourceDescription> image_resrouces_descriptions;
+            std::vector<vkal::ImageResourceDescription> image_resources_descriptions;
             size_t index = 0;
             for (const auto& entry : image_map) {
-                image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
+                image_resources_descriptions.push_back(vkal::ImageResourceDescription{
                     .identifier = entry.first,
                     .barrier =
                         vkal::ResourceBarrier{
@@ -646,7 +646,7 @@ int main() {
                 });
                 index++;
             }
-            image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
+            image_resources_descriptions.push_back(vkal::ImageResourceDescription{
                 .identifier = "msaa",
                 .barrier =
                     vkal::ResourceBarrier{
@@ -656,7 +656,7 @@ int main() {
                         .stage = vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                     },
             });
-            image_resrouces_descriptions.push_back(vkal::ImageResourceDescription{
+            image_resources_descriptions.push_back(vkal::ImageResourceDescription{
                 .identifier = "depth",
                 .barrier =
                     vkal::ResourceBarrier{
@@ -669,8 +669,8 @@ int main() {
                     },
             });
 
-            std::vector<vkal::SamplerResourceDescription> sampler_resouces_description;
-            sampler_resouces_description.push_back(vkal::SamplerResourceDescription{
+            std::vector<vkal::SamplerResourceDescription> sampler_resources_description;
+            sampler_resources_description.push_back(vkal::SamplerResourceDescription{
                 .identifier = "basic sampler",
                 .set = 0,
                 .binding = 2,
@@ -701,10 +701,10 @@ int main() {
             texture_pass = texture_pass_ptr.get();
             vkal::RenderPassDescription pass_description{
                 .identifier = "texture pass",
-                .buffer_resources = buffer_resrouces_descriptions,
-                .image_resources = image_resrouces_descriptions,
+                .buffer_resources = buffer_resources_descriptions,
+                .image_resources = image_resources_descriptions,
                 .render_attachments = render_attachments,
-                .sampler_resources = sampler_resouces_description,
+                .sampler_resources = sampler_resources_description,
                 .pipeline = "texture map pipeline",
             };
             render_graph->add_pass(std::move(texture_pass_ptr), std::move(pass_description));

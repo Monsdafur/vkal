@@ -132,7 +132,7 @@ static void generate_mipmaps(vkal::Image& image, vk::CommandBuffer command) {
     // Now we want to only transit each mip level for each iteration from
     // transfer dst to transfer src
     for (uint32_t i = 0; i < mip_count; ++i) {
-        // Transit currernt mip level to src layout
+        // Transition current mip level to src layout
         barrier_image(image, command, src_access, src_stage, src_layout, i, 1);
 
         // In the last mip level we only transit and not blitting
@@ -173,7 +173,7 @@ load_images(vk::Queue queue, vk::CommandBuffer command, vkal::Device& device,
             throw std::runtime_error(std::format("Failed to load image {}", path.generic_string()));
         }
         if (unconverted_surface->format !=
-            SDL_PIXELFORMAT_ABGR8888) { // Convert of Srgb format if the surface isn't already in
+            SDL_PIXELFORMAT_ABGR8888) { // Convert to Srgb format if the surface isn't already in
                                         // the correct format
             surfaces.push_back(SDL_ConvertSurface(unconverted_surface, SDL_PIXELFORMAT_ABGR8888));
             SDL_DestroySurface(unconverted_surface);
@@ -267,7 +267,7 @@ nlohmann::json load_level_from_path(const std::filesystem::path& path, const std
         }
     }
     if (!level_data_opt.has_value()) {
-        throw std::runtime_error(std::format("Cannot find any level with identifer {}", level));
+        throw std::runtime_error(std::format("Cannot find any level with identifier {}", level));
     }
     const nlohmann::json& level_data = *level_data_opt;
     for (const auto& [index, layer] : level_data.at("layerInstances").items()) {

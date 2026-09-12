@@ -14,7 +14,7 @@ struct DescriptorLayoutParams {
 
 class DescriptorLayout {
   public:
-    // No copy and mo move
+    // No copy and no move
     DescriptorLayout(const DescriptorLayout&) = delete;
     DescriptorLayout& operator=(const DescriptorLayout&) = delete;
     DescriptorLayout(DescriptorLayout&&) = delete;

@@ -98,7 +98,7 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
     for (vk::DescriptorPoolSize& pool_size : layout_pool_sizes) {
         if (pool_size.descriptorCount > this->pool_size) {
             throw std::runtime_error(std::format("Pool size {} for descriptor type {} exceeds "
-                                                 "designated descroptor pool size limit {}",
+                                                 "designated descriptor pool size limit {}",
                                                  pool_size.descriptorCount,
                                                  vk::to_string(pool_size.type), this->pool_size));
         }
@@ -123,7 +123,7 @@ Descriptor::get_pool(const std::vector<std::reference_wrapper<DescriptorLayout>>
         .pool_sizes = current_pool_sizes,
     }));
 
-    // A new pool is created to accomodate the allocated set so all pool indices matches the set
+    // A new pool is created to accommodate the allocated set so all pool indices matches the set
     // pool indices
     std::vector<size_t> pool_indices(layout_pool_sizes.size());
     for (const auto& [index, pool_index] : std::ranges::views::enumerate(pool_indices)) {
