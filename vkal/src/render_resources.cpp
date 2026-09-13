@@ -155,4 +155,34 @@ Pipeline& RenderResources::get_pipeline(const std::string& identifier) {
     return *this->pipelines.at(identifier);
 }
 
+///////////////////////////////////////////////////////////
+void RenderResources::remove_descriptor_layout(const std::string& identifier) {
+    this->descriptor_layouts.erase(identifier);
+}
+
+///////////////////////////////////////////////////////////
+void RenderResources::remove_pipeline_layout(const std::string& identifier) {
+    this->pipeline_layouts.erase(identifier);
+}
+
+///////////////////////////////////////////////////////////
+void RenderResources::remove_pipeline(const std::string& identifier) {
+    this->pipelines.erase(identifier);
+}
+
+///////////////////////////////////////////////////////////
+void RenderResources::remove_buffer(const std::string& identifier) {
+    this->buffers.erase(identifier);
+}
+
+///////////////////////////////////////////////////////////
+void RenderResources::remove_image(const std::string& identifier) {
+    this->images.erase(identifier);
+}
+
+///////////////////////////////////////////////////////////
+void RenderResources::remove_sampler(const std::string& identifier) {
+    this->samplers.erase(identifier);
+}
+
 } // namespace vkal

@@ -121,6 +121,18 @@ class RenderResources {
 
     Pipeline& get_pipeline(const std::string& identifier);
 
+    void remove_descriptor_layout(const std::string& identifier);
+
+    void remove_pipeline_layout(const std::string& identifier);
+
+    void remove_pipeline(const std::string& identifier);
+
+    void remove_buffer(const std::string& identifier);
+
+    void remove_image(const std::string& identifier);
+
+    void remove_sampler(const std::string& identifier);
+
   private:
     Device& device;
     MemoryAllocator& memory_allocator;
