@@ -51,8 +51,13 @@ DescriptorSet::~DescriptorSet() {
 }
 
 ///////////////////////////////////////////////////////////
-vk::DescriptorSet DescriptorSet::get(uint32_t index) {
+vk::DescriptorSet DescriptorSet::get(uint32_t index) const {
     return this->vk_descriptor_sets.at(index);
+}
+
+///////////////////////////////////////////////////////////
+const std::vector<vk::DescriptorSet>& DescriptorSet::get() const {
+    return this->vk_descriptor_sets;
 }
 
 ///////////////////////////////////////////////////////////

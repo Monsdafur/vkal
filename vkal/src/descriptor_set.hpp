@@ -50,7 +50,9 @@ class DescriptorSet {
 
     ~DescriptorSet();
 
-    vk::DescriptorSet get(uint32_t index);
+    vk::DescriptorSet get(uint32_t index) const;
+
+    const std::vector<vk::DescriptorSet>& get() const;
 
     size_t get_set_count() const;
 
