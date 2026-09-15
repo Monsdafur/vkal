@@ -412,12 +412,8 @@ void RenderGraph::generate_passes() {
             pass->render_attachment_infos.reserve(pass->render_attachment_builders.size());
         }
 
-        std::optional<std::reference_wrapper<DescriptorSet>> descriptor_set = std::nullopt;
-        if (pass->descriptor_set != nullptr) {
-            descriptor_set = *pass->descriptor_set;
-        }
-        this->render_passes[pass->pass_index]->setup_metadata(
-            pass->buffer_resources, pass->image_resources, pass->pipeline, descriptor_set);
+        this->render_passes[pass->pass_index]->setup_metadata(pass->buffer_resources,
+                                                              pass->image_resources);
         this->pass_data.push_back(std::move(pass));
     }
 
@@ -503,6 +499,14 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue vk_queue,
             .setImageMemoryBarriers(pass->image_barriers);
         vk_command.pipelineBarrier2(dependency_info);
 
+        // Bind pipeline and descriptor sets
+        vk_command.bindPipeline(pass->pipeline->get().get_bind_point(),
+                                pass->pipeline->get().get());
+        vk_command.bindDescriptorSets(pass->pipeline->get().get_bind_point(),
+                                      pass->pipeline->get().get_layout().get(), 0,
+                                      pass->descriptor_set->get(), {});
+
+        // Begin render pass execution
         vk::Extent3D render_extent;
         std::optional<vk::RenderingAttachmentInfo> depth_attachment_opt = std::nullopt;
         if (!pass->render_attachment_builders.empty()) {
@@ -566,7 +570,7 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue vk_queue,
         }
     }
 
-    // Post render swapchain barriers
+    // Post render swapchain barrier
     swapchain_barrier.setSrcAccessMask(swapchain_image.get_access(0))
         .setSrcStageMask(swapchain_image.get_stage(0))
         .setOldLayout(swapchain_image.get_layout(0))
