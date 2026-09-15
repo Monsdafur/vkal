@@ -209,6 +209,7 @@ RenderGraph::~RenderGraph() {
 void RenderGraph::add_pass(std::unique_ptr<RenderPass> render_pass,
                            const RenderPassDescription& pass_description) {
     this->pass_descriptions.push_back(pass_description);
+    this->render_pass_map.insert_or_assign(pass_description.identifier, render_pass.get());
     this->render_passes.push_back(std::move(render_pass));
 }
 
@@ -223,7 +224,7 @@ void RenderGraph::compile() {
 
 ///////////////////////////////////////////////////////////
 void RenderGraph::generate_passes() {
-    debug(std::format("Compiling render graph ({} passes)", this->pass_descriptions.size()));
+    debug(std::format("Compiling render graph ({} passes)", this->pass_order.size()));
     for (size_t pass_index : this->pass_order) {
         RenderPassDescription& pass_description = this->pass_descriptions[pass_index];
 
@@ -441,6 +442,23 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue vk_queue,
 
     Image& swapchain_image = this->surface.get_image(swapchain_index);
 
+    // Perform pre-render swapchain barrier
+    vk::ImageMemoryBarrier2 swapchain_barrier;
+    swapchain_barrier.setImage(swapchain_image.get())
+        .setSrcAccessMask(vk::AccessFlagBits2::eNone)
+        .setSrcStageMask(vk::PipelineStageFlagBits2::eNone)
+        .setOldLayout(vk::ImageLayout::eUndefined)
+        .setDstAccessMask(vk::AccessFlagBits2::eColorAttachmentWrite)
+        .setDstStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput)
+        .setNewLayout(vk::ImageLayout::eColorAttachmentOptimal)
+        .setSubresourceRange(vk::ImageSubresourceRange(swapchain_image.get_aspect(), 0, 1, 0, 1));
+    swapchain_image.set_barrier(vk::ImageLayout::eColorAttachmentOptimal,
+                                vk::AccessFlagBits2::eColorAttachmentWrite,
+                                vk::PipelineStageFlagBits2::eColorAttachmentOutput);
+    vk::DependencyInfo swapchain_dependencies;
+    swapchain_dependencies.setImageMemoryBarriers(swapchain_barrier);
+    vk_command.pipelineBarrier2(swapchain_dependencies);
+
     for (std::unique_ptr<RenderPassData>& pass : this->pass_data) {
         pass->render_attachment_infos.clear();
         pass->buffer_barriers.clear();
@@ -479,23 +497,6 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue vk_queue,
             pass->image_barriers.push_back(image_barrier);
             image.set_barrier(image_barrier_builder.layout, image_barrier_builder.access,
                               image_barrier_builder.stage);
-        }
-
-        if (pass->write_swapchain) {
-            vk::ImageMemoryBarrier2 swapchain_barrier;
-            swapchain_barrier.setImage(swapchain_image.get())
-                .setSrcAccessMask(vk::AccessFlagBits2::eNone)
-                .setSrcStageMask(vk::PipelineStageFlagBits2::eNone)
-                .setOldLayout(vk::ImageLayout::eUndefined)
-                .setDstAccessMask(vk::AccessFlagBits2::eColorAttachmentWrite)
-                .setDstStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput)
-                .setNewLayout(vk::ImageLayout::eColorAttachmentOptimal)
-                .setSubresourceRange(
-                    vk::ImageSubresourceRange(swapchain_image.get_aspect(), 0, 1, 0, 1));
-            swapchain_image.set_barrier(vk::ImageLayout::eColorAttachmentOptimal,
-                                        vk::AccessFlagBits2::eColorAttachmentWrite,
-                                        vk::PipelineStageFlagBits2::eColorAttachmentOutput);
-            pass->image_barriers.push_back(swapchain_barrier);
         }
 
         dependency_info.setBufferMemoryBarriers(pass->buffer_barriers)
@@ -563,23 +564,17 @@ void RenderGraph::execute(uint32_t swapchain_index, vk::Queue vk_queue,
         } else { // If pass contains no render attachments proceed without render commands
             this->render_passes[pass->pass_index]->render(vk_command);
         }
-
-        // Post render barriers
-        if (pass->write_swapchain) {
-            vk::ImageMemoryBarrier2 swapchain_barrier;
-            swapchain_barrier.setImage(swapchain_image.get())
-                .setSrcAccessMask(swapchain_image.get_access(0))
-                .setSrcStageMask(swapchain_image.get_stage(0))
-                .setOldLayout(swapchain_image.get_layout(0))
-                .setDstAccessMask(vk::AccessFlagBits2::eColorAttachmentRead)
-                .setDstStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput)
-                .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
-                .setSubresourceRange(
-                    vk::ImageSubresourceRange(swapchain_image.get_aspect(), 0, 1, 0, 1));
-            dependency_info.setBufferMemoryBarriers({}).setImageMemoryBarriers(swapchain_barrier);
-            vk_command.pipelineBarrier2(dependency_info);
-        }
     }
+
+    // Post render swapchain barriers
+    swapchain_barrier.setSrcAccessMask(swapchain_image.get_access(0))
+        .setSrcStageMask(swapchain_image.get_stage(0))
+        .setOldLayout(swapchain_image.get_layout(0))
+        .setDstAccessMask(vk::AccessFlagBits2::eColorAttachmentRead)
+        .setDstStageMask(vk::PipelineStageFlagBits2::eColorAttachmentOutput)
+        .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
+        .setSubresourceRange(vk::ImageSubresourceRange(swapchain_image.get_aspect(), 0, 1, 0, 1));
+    vk_command.pipelineBarrier2(swapchain_dependencies);
 
     vk_command.end();
 
@@ -606,6 +601,20 @@ void RenderGraph::rebind_resources() {
     this->pass_data.clear();
     this->generate_passes();
     debug("Rebound all resources");
+}
+
+///////////////////////////////////////////////////////////
+void RenderGraph::reset() {
+    this->render_pass_map.clear();
+    this->render_passes.clear();
+    this->pass_data.clear();
+    this->pass_order.clear();
+    this->pass_descriptions.clear();
+}
+
+///////////////////////////////////////////////////////////
+RenderPass* RenderGraph::get_render_pass(const std::string& identifier) {
+    return this->render_pass_map.at(identifier);
 }
 
 ///////////////////////////////////////////////////////////

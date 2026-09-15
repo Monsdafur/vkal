@@ -178,6 +178,10 @@ class RenderGraph {
 
     void rebind_resources();
 
+    void reset();
+
+    RenderPass* get_render_pass(const std::string& identifier);
+
     vk::Semaphore get_semaphore();
 
   private:
@@ -192,6 +196,7 @@ class RenderGraph {
     std::vector<size_t> pass_order;
     std::vector<std::unique_ptr<RenderPassData>> pass_data;
     std::vector<std::unique_ptr<RenderPass>> render_passes;
+    std::unordered_map<std::string, RenderPass*> render_pass_map;
 
     vk::Semaphore vk_semaphore;
     vk::Fence vk_fence;
