@@ -52,6 +52,8 @@ class DescriptorSet {
 
     vk::DescriptorSet get(uint32_t index);
 
+    size_t get_set_count() const;
+
     void write_buffer(const BufferWriteParams& write_params);
 
     void write_sampler(const SamplerWriteParams& write_params);
@@ -65,7 +67,7 @@ class DescriptorSet {
     std::vector<std::reference_wrapper<DescriptorLayout>> descriptor_layouts;
     Descriptor& descriptor;
     DescriptorPoolInfo pool_info;
-    std::vector<vk::DescriptorSet> vk_sets;
+    std::vector<vk::DescriptorSet> vk_descriptor_sets;
 };
 
 using DescriptorSetPtr = std::unique_ptr<DescriptorSet>;

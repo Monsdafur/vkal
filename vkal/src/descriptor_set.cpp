@@ -29,13 +29,13 @@ DescriptorSet::DescriptorSet(const DescriptorSetParams& params)
     this->descriptor.dump();
 #endif
 
-    this->vk_sets = this->device.get().allocateDescriptorSets(set_allocate_info);
+    this->vk_descriptor_sets = this->device.get().allocateDescriptorSets(set_allocate_info);
 }
 
 ///////////////////////////////////////////////////////////
 DescriptorSet::~DescriptorSet() {
     this->device.get().freeDescriptorSets(this->pool_info.descriptor_pool_data.vk_descriptor_pool,
-                                          this->vk_sets);
+                                          this->vk_descriptor_sets);
     for (const auto& [index, pool_index] :
          std::ranges::views::enumerate(this->pool_info.pool_size_indices)) {
         this->pool_info.descriptor_pool_data.pool_sizes[pool_index].descriptorCount +=
@@ -52,7 +52,12 @@ DescriptorSet::~DescriptorSet() {
 
 ///////////////////////////////////////////////////////////
 vk::DescriptorSet DescriptorSet::get(uint32_t index) {
-    return this->vk_sets.at(index);
+    return this->vk_descriptor_sets.at(index);
+}
+
+///////////////////////////////////////////////////////////
+size_t DescriptorSet::get_set_count() const {
+    return this->vk_descriptor_sets.size();
 }
 
 ///////////////////////////////////////////////////////////
@@ -68,7 +73,7 @@ void DescriptorSet::write_buffer(const BufferWriteParams& write_params) {
         .setDescriptorCount(descriptor_buffer_infos.size())
         .setDstArrayElement(write_params.first_element)
         .setDescriptorType(write_params.type)
-        .setDstSet(this->vk_sets[write_params.set_index])
+        .setDstSet(this->vk_descriptor_sets[write_params.set_index])
         .setDstBinding(write_params.binding);
 
     this->device.get().updateDescriptorSets(write_descriptor_set, {});
@@ -101,7 +106,7 @@ void DescriptorSet::write_sampler(const SamplerWriteParams& write_params) {
         .setDescriptorCount(descriptor_image_infos.size())
         .setDstArrayElement(write_params.first_element)
         .setDescriptorType(write_params.type)
-        .setDstSet(this->vk_sets[write_params.set_index])
+        .setDstSet(this->vk_descriptor_sets[write_params.set_index])
         .setDstBinding(write_params.binding);
     this->device.get().updateDescriptorSets(write_descriptor_set, {});
 }
