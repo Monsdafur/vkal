@@ -1,8 +1,8 @@
 #pragma once
 
-#include <SDL3/SDL_vulkan.h>
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include "instance.hpp"
+
+#include <SDL3/SDL_vulkan.h>
 
 #include <cstdint>
 

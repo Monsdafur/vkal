@@ -247,7 +247,8 @@ void Device::get_queues() {
         this->vk_queues.push_back(this->vk_device.getQueue2(device_queue_info));
 
         command_pool_create_info.setQueueFamilyIndex(i);
-        this->vk_command_pools.push_back(this->vk_device.createCommandPool(command_pool_create_info));
+        this->vk_command_pools.push_back(
+            this->vk_device.createCommandPool(command_pool_create_info));
     }
 }
 
