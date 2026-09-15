@@ -133,6 +133,8 @@ class RenderResources {
 
     void remove_sampler(const std::string& identifier);
 
+    void reset();
+
   private:
     Device& device;
     MemoryAllocator& memory_allocator;

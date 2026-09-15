@@ -185,4 +185,14 @@ void RenderResources::remove_sampler(const std::string& identifier) {
     this->samplers.erase(identifier);
 }
 
+///////////////////////////////////////////////////////////
+void RenderResources::reset() {
+    this->descriptor_layouts.clear();
+    this->pipeline_layouts.clear();
+    this->pipelines.clear();
+    this->buffers.clear();
+    this->images.clear();
+    this->samplers.clear();
+}
+
 } // namespace vkal
